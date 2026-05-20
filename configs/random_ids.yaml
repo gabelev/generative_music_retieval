@@ -1,0 +1,12 @@
+condition: random_ids
+inherits: base.yaml
+
+semantic_ids:
+  source: random
+  n_levels: 3
+  codebook_size: 256
+
+notes: >
+  Random 3-token tuples assigned per track. Baseline: tests whether the
+  generative model can memorize arbitrary track-to-track mappings without
+  any structure in the SemID space.

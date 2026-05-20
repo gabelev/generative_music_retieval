@@ -1,0 +1,17 @@
+torch>=2.0
+torchaudio>=2.0
+transformers>=4.30
+encodec>=0.1.1
+scikit-learn>=1.3
+faiss-cpu>=1.7
+numpy
+scipy
+pandas
+matplotlib
+seaborn
+deepdish
+h5py
+pyyaml
+tqdm
+yt-dlp
+sentencepiece

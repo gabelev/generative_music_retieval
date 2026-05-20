@@ -1,0 +1,62 @@
+seed: 42
+
+audio:
+  sample_rate: 24000
+  mono: true
+  clip_seconds: 30
+  clip_strategy: center
+
+mert:
+  model_name: m-a-p/MERT-v1-95M
+  layers: [7, 8, 9, 10, 11, 12]
+  pool_time: mean
+  pool_layers: mean
+  embedding_dim: 768
+
+encodec:
+  bandwidth_kbps: 1.5
+  n_codebooks: 3
+  aggregation: majority_vote
+
+rqvae:
+  n_levels: 3
+  codebook_size: 256
+  kmeans_batch_size: 4096
+
+t5:
+  base_model: t5-small
+  encoder_input: semid          # one of: semid, mert_projection
+  beam_width: 20
+  max_target_len: 4
+  prefix_token: "retrieve cover:"
+
+train:
+  lr: 5.0e-4
+  optimizer: adamw
+  weight_decay: 0.01
+  batch_size: 64
+  max_epochs: 15
+  early_stopping_patience: 3
+  dropout: 0.3
+  num_workers: 4
+  warmup_steps: 200
+  gradient_clip: 1.0
+
+data:
+  covers80_dir: data/raw/covers80
+  discogs_vi_dir: data/raw/discogs_vi
+  splits_dir: data/splits
+  embeddings_dir: data/embeddings
+  semantic_ids_dir: data/semantic_ids
+  train_frac: 0.70
+  val_frac: 0.15
+  test_frac: 0.15
+
+eval:
+  recall_ks: [1, 5, 10]
+  beam_width: 20
+  top_k: 20
+
+logging:
+  out_dir: runs
+  log_every_n_steps: 25

@@ -1,0 +1,12 @@
+condition: mert_ids
+inherits: base.yaml
+
+semantic_ids:
+  source: rqvae_on_mert
+  n_levels: 3
+  codebook_size: 256
+
+notes: >
+  Train RQ-VAE (sequential k-means) on 768-d MERT-v1-95M embeddings.
+  Hypothesis: covers within a clique share SemID prefixes because MERT's
+  CQT teacher encodes harmonic/tonal structure.

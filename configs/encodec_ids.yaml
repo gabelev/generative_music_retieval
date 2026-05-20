@@ -1,0 +1,13 @@
+condition: encodec_ids
+inherits: base.yaml
+
+semantic_ids:
+  source: encodec_direct
+  n_levels: 3
+  codebook_size: 1024
+  aggregation: majority_vote
+
+notes: >
+  Use EnCodec 24kHz RVQ codebook indices directly as Semantic IDs.
+  No RQ-VAE retraining; aggregate frame-level codes to one token per level
+  via majority vote. Tests the RVQ <-> RQ-VAE architectural equivalence.

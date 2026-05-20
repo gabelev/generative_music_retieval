@@ -216,3 +216,34 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# macOS
+.DS_Store
+
+# Local-only config / agent state
+.claude/
+.gitignore
+
+# Project data and artifacts (large, regenerable)
+data/raw/**
+!data/raw/.gitkeep
+data/embeddings/**
+!data/embeddings/.gitkeep
+data/semantic_ids/*.csv
+data/semantic_ids/*.pkl
+data/splits/*.csv
+runs/
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.wav
+*.mp3
+*.flac
+*.pkl
+
+# Local model checkpoints
+checkpoints/
+*.ckpt
+*.pt
+*.safetensors
