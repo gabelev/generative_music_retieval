@@ -15,3 +15,4 @@ pyyaml
 tqdm
 yt-dlp
 sentencepiece
+huggingface_hub>=0.24
