@@ -29,6 +29,16 @@ ENCODEC_BANDWIDTH=${ENCODEC_BANDWIDTH:-3.0}
 cd "$(dirname "$0")/.."
 mkdir -p runs data/embeddings/mert data/embeddings/encodec data/semantic_ids data/splits
 
+# Auto-activate .venv if present — protects against running without the venv
+# active (e.g., re-entering tmux pane, nohup'ing from the wrong shell).
+if [ -z "${VIRTUAL_ENV:-}" ] && [ -f .venv/bin/activate ]; then
+    echo "Auto-activating .venv"
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+fi
+echo "Python: $(which python) ($(python --version))"
+echo "VIRTUAL_ENV: ${VIRTUAL_ENV:-<none>}"
+
 banner() {
     echo
     echo "================================================================"
