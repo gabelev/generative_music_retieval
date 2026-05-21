@@ -75,18 +75,19 @@ Given a query track, the model autoregressively generates the Semantic ID of a c
 
 ### 4.2 Datasets
 
-**Development set: Covers80** (Ellis, 2007)
-- 80 cliques, 2 versions each = 160 tracks
-- Audio included (164MB WAV, downloadable)
-- Used for pipeline development, sanity checks, qualitative analysis
+**In-distribution train/val/test: Discogs-VI-YT subset** (Araz et al., ISMIR 2024)
+- Full dataset: ~493K versions across ~98K cliques (metadata 2024-07-01)
+- We sampled 2,500 cliques (≥2 versions each) → 12,006 candidate YouTube IDs
+- yt-dlp crawl (May 2026) yielded **3,413 successful tracks** (28.4% per-track success rate; ~28% link rot, ~44% bot-detection / sign-in walls)
+- After filtering to cliques with ≥2 surviving versions: **696 usable cliques across 3,192 tracks**
+- Clique-level split 70/15/15: **train 487 / val 104 / test 105 cliques** (~42K training ordered pairs)
+- Distribution is heavy-tailed: 57% of usable cliques have exactly 2 versions, but a long tail extends to 60-130 versions per clique (classic covers like "Hallelujah" or "Yesterday")
+- Audio standardized: 24kHz mono WAV, 30-sec center clip
 
-**Main evaluation: Discogs-VI-YT subset** (Araz et al., ISMIR 2024)
-- Full dataset: ~493K versions across ~98K cliques
-- We crawl a subset: target ~5-10K tracks across 2-3K cliques via yt-dlp
-- YouTube IDs are official uploads, high quality
-- Rich metadata (genre, style, year) for analysis
-- Pre-computed CQT features available on Zenodo (8.8GB)
-- Train/val/test splits provided
+**Cross-dataset held-out test: Covers80** (Ellis, 2007)
+- 80 cliques, 2 versions each = 160 tracks
+- Bundled audio (164 MB tarball, no crawl, no link rot)
+- **The model never sees Covers80 during training** — evaluates cross-dataset generalization in addition to in-distribution Discogs-VI test split
 
 ### 4.3 Semantic ID Construction (3+ conditions)
 
@@ -145,36 +146,37 @@ Given a query track, the model autoregressively generates the Semantic ID of a c
 
 ---
 
-## 5. Timeline (May 20 — June 1)
+## 5. Timeline (compressed; treat as ordered phases, not date-bound)
 
-### Phase 1: Data (May 20-21)
-- Scaffold project repo and install dependencies
-- Download Covers80 (immediate, 164MB)
-- Download Discogs-VI metadata + pre-computed features from Zenodo
-- Start Discogs-VI-YT audio crawl via yt-dlp (overnight)
+### Phase 1: Data — DONE
+- Repo scaffolded with configs/, src/, scripts/, requirements.txt
+- Covers80 downloaded + clique CSV built (80 cliques, 160 tracks, 0 missing)
+- Discogs-VI metadata parsed (493K version rows, 98K cliques)
+- 12K-track subset crawled via yt-dlp → 3,413 ok in private HF dataset repo
+  `gabelev/discogs-vi-csi-subset`; 696 usable cliques after filtering for ≥2 versions
 
-### Phase 2: Feature extraction (May 21-22)
-- MERT-v1-95M embedding extraction (Covers80 first, then Discogs-VI)
-- EnCodec RVQ code extraction
+### Phase 2: Feature extraction
+- MERT-v1-95M embedding extraction on Covers80 (160 tracks) and Discogs-VI usable subset (~3,200 tracks)
+- EnCodec RVQ code extraction on the same
 
-### Phase 3: Semantic IDs (May 22-23)
-- Train RQ-VAE on MERT embeddings
-- Process EnCodec codes into track-level SemIDs
+### Phase 3: Semantic IDs
+- Train RQ-VAE on MERT embeddings (Discogs-VI usable subset)
+- Process EnCodec codes into track-level SemIDs (majority-vote aggregation)
 - Generate random ID baseline
-- Compute clash rates, codebook utilization, prefix overlap on Covers80 as sanity check
+- Compute clash rates, codebook utilization, prefix overlap — sanity check on Covers80 first
 
-### Phase 4: Models (May 24-26)
-- Train T5-small generative retrieval model (one per SemID condition)
-- Implement bi-encoder baseline
-- Run inference with beam search
+### Phase 4: Models
+- Train T5-small generative retrieval model, one per SemID condition (random, MERT-RQ-VAE, EnCodec-direct)
+- Implement bi-encoder baseline (MERT cosine + FAISS)
+- Run inference with constrained beam search
 
-### Phase 5: Evaluation (May 27-28)
-- Full evaluation suite (MR1, MRR, MAP, Recall@k)
-- t-SNE visualization
-- Cold-start experiment
-- Error analysis
+### Phase 5: Evaluation
+- In-distribution eval on Discogs-VI test split (105 cliques)
+- Cross-dataset eval on Covers80 (80 cliques, never seen during training)
+- Metrics: MR1, MRR, MAP, Recall@1/5/10
+- t-SNE visualization, prefix-overlap analysis, error analysis
 
-### Phase 6: Paper (May 28-31)
+### Phase 6: Paper
 - Write paper in IEEE LaTeX format (6 pages)
 - Generate all tables and figures
 - IEEE PDF eXpress compliance
@@ -235,11 +237,12 @@ Given a query track, the model autoregressively generates the Semantic ID of a c
 
 ## 8. Risk Mitigation
 
-| Risk | Mitigation |
+| Risk | Status / Mitigation |
 |------|-----------|
-| Discogs-VI-YT crawl too slow or high link rot | Fall back to Covers80 as primary eval (small but with audio). Frame as proof-of-concept. |
+| Discogs-VI-YT crawl too slow or high link rot | **Confirmed (May 2026 crawl): 72% loss to link rot + bot detection.** Mitigated by using Discogs-VI as in-distribution train/val/test (487/104/105 cliques) and Covers80 as cross-dataset held-out test. The cross-dataset framing is empirically forced but is a stronger paper story than the original Discogs-VI-only plan. |
+| YouTube bot detection mid-crawl | ~44% of failed attempts were "Sign in to confirm you're not a bot." Recoverable with logged-in cookies via `--cookies-file`; not pursued for this submission because in-distribution + cross-dataset eval is already sufficient. Recovery is queued as future work / supplemental run. |
 | MERT SemIDs capture acoustic similarity, not compositional | This IS an interesting negative result. Discuss in paper: "audio codec features encode surface acoustics, not deep compositional structure." Points to future work on disentanglement. |
-| Covers80 too small for meaningful training | Use all 160 tracks for RQ-VAE training, leave-one-clique-out evaluation. Small N is acknowledged as limitation. |
-| T5 overfits on small dataset | Aggressive regularization (dropout 0.3), early stopping, report overfitting analysis. |
+| Covers80 too small for standalone training | Not used for training in current setup — Discogs-VI provides 42K training pairs. Covers80 is held-out only. |
+| T5 overfits on small dataset | Aggressive regularization (dropout 0.3), early stopping on val MRR, report overfitting analysis. |
 | EnCodec frame-level codes too noisy as track-level SemIDs | Multiple aggregation strategies (majority vote, center frame, mean-pool). Report best. |
 | 6-page limit too tight | Focus on main comparison table + one analysis figure. Code/details go to GitHub. |

@@ -141,29 +141,50 @@ data/raw/covers80/
 ### Task 3: Download Discogs-VI-YT Metadata
 
 Download from Zenodo: `https://zenodo.org/records/13983028`
-- `Discogs-VI-YT-light-20240701.json` — lightweight file with clique IDs, version IDs, YouTube IDs
+- `main.zip` (1.4 GB) — contains `Discogs-VI-YT-20240701-light.json` (the lightweight JSON with clique IDs, version IDs, YouTube IDs)
 - `intermediary.zip` (8.8GB) — pre-computed CQT features (optional, lower priority)
 
-Parse the JSON to extract: `version_id, clique_id, youtube_id`. Filter to a manageable subset: 2-3K cliques with at least 2 versions each, targeting ~5-10K total tracks.
+Parse the JSON: it's a dict keyed by `clique_id`, each value a list of `{version_id, track_title, youtube_id}`. Sample a manageable subset: 2,500 cliques with at least 2 versions each → ~12K total candidate tracks.
 
 Output: `data/splits/discogs_vi_subset.csv` with columns `version_id, clique_id, youtube_id`.
 
-### Task 4: Crawl Discogs-VI-YT Audio
+### Task 4: Crawl Discogs-VI-YT Audio (with HF stream upload)
 
-Use yt-dlp to download audio for the subset:
+Use `src/data/crawl_youtube.py`: yt-dlp downloads bestaudio per ID; ffmpeg
+center-clips to 30 sec and transcodes to 24kHz mono WAV; the WAV is staged
+locally and uploaded to a private Hugging Face dataset repo in batches of
+100 per commit (HF free tier = 128 commits/hour on dataset repos — single-file
+commits blow the rate limit fast). Local files are deleted after each batch
+commit so persistent local disk stays under ~150 MB.
 
-```bash
-yt-dlp -x --audio-format wav --audio-quality 0 \
-    --output "data/raw/discogs_vi/%(id)s.%(ext)s" \
-    --batch-file youtube_ids.txt
-```
+Required CLI tools / runtime:
+- `yt-dlp` (modern build supporting `--js-runtimes`)
+- `ffmpeg`, `ffprobe`
+- `node` (or `deno`) — yt-dlp needs a JS runtime to decrypt YouTube's signatures;
+  without one yt-dlp silently fails formats with "Video unavailable"
 
-Post-process: convert to 24kHz mono WAV (MERT requirement):
-```bash
-ffmpeg -i input.wav -ar 24000 -ac 1 output.wav
-```
+Auth: `HF_TOKEN` env var or `huggingface-cli login`.
 
-Track success/failure rates. Update the subset CSV to reflect which tracks were successfully downloaded.
+**Reality check — link rot and bot detection.** YouTube IDs in the Discogs-VI metadata (timestamped 2024-07-01) rot fast, especially for cover songs (DMCA takedowns). Empirically, of a 12,006-track crawl in May 2026:
+- 3,413 ok (28.4%)
+- 3,404 video_unavailable (28.3% — deletions/takedowns/region-locks)
+- 5,270 sign-in / bot-detection ("Sign in to confirm you're not a bot") (43.9%)
+- ~250 other transient yt-dlp errors
+
+Run inside `tmux` or `screen`, with `caffeinate -dis` to keep the Mac awake.
+Track success/failure rates in `data/splits/discogs_vi_download_log.csv`
+(cols: version_id, clique_id, youtube_id, status, hf_path, error).
+
+### Task 4b: Filter to surviving cliques
+
+After the crawl, derive `data/splits/discogs_vi_usable.csv` keeping only
+cliques with ≥2 successfully-downloaded versions. Drop orphan tracks whose
+clique-mates didn't make it through.
+
+Typical yield from the May 2026 crawl: 696 usable cliques across 3,192
+tracks (~42K training ordered pairs at 70% split). Distribution is heavy-
+tailed: most cliques have 2-3 versions, a long tail extends to 60-130 versions
+(e.g., classic covers like "Yesterday" or "Hallelujah").
 
 ### Task 5: MERT-v1-95M Embedding Extraction
 
@@ -406,7 +427,13 @@ Also compute MAP and Recall@k (k=1,5,10).
 - All audio processing at 24kHz mono (MERT requirement)
 - 30-second center clips from each track
 - Split by clique, never by track, to prevent data leakage
-- Covers80 is for dev iteration. Discogs-VI-YT subset is for the actual paper results.
-- If Discogs-VI crawl fails or is too slow, Covers80 alone is acceptable as a proof-of-concept (acknowledge small N as limitation)
+- Covers80 + Discogs-VI together form the paper's eval. Covers80 (80 cliques)
+  serves as a CROSS-DATASET held-out test set — the model never sees any
+  Covers80 track during training — while Discogs-VI provides in-distribution
+  train/val/test splits (487/104/105 cliques) and the larger training corpus.
+- This setup is empirically determined by what the May 2026 yt-dlp crawl
+  yielded (28% per-track success rate due to YouTube link rot + bot detection),
+  not an a priori design choice. It happens to be a stronger paper story:
+  cross-dataset generalization is more interesting than single-dataset eval.
 - The paper deadline is June 1. Prioritize getting end-to-end results over perfection in any single component.
 - Use chaos-dimension (chaosdimension.fyi) to track progress on tasks in the generative-retrieval workstream.
