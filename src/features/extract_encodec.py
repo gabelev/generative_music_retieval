@@ -135,6 +135,12 @@ def main() -> None:
     np.savez(out_path, **codes_out)
     print(f"Done. Wrote {len(codes_out)} entries to {out_path}")
     print(f"Counts: {counts}")
+    if counts["ok"] == 0 and len(todo) > 0:
+        raise SystemExit(
+            f"ERROR: 0/{len(todo)} EnCodec extractions succeeded. "
+            f"Likely missing torchaudio backend — try `apt-get install -y libsndfile1 ffmpeg` "
+            f"and `pip install soundfile`."
+        )
 
 
 if __name__ == "__main__":

@@ -14,6 +14,12 @@ cd "$(dirname "$0")/.."
 PYTHON=${PYTHON:-python3}
 TORCH_INDEX=${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
 
+echo "=== System libs (audio backend deps for torchaudio) ==="
+if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq && apt-get install -y -qq libsndfile1 ffmpeg || \
+        echo "  warn: apt-get install failed; continue if libsndfile1 + ffmpeg already present"
+fi
+
 echo "=== Cleaning stale venv ==="
 rm -rf .venv
 
@@ -29,7 +35,7 @@ echo "=== Installing remaining Python deps ==="
 TMP_REQ=$(mktemp)
 grep -vE "^(torch|torchaudio)" requirements.txt > "$TMP_REQ"
 .venv/bin/pip install -r "$TMP_REQ"
-.venv/bin/pip install --upgrade "transformers==4.46.3" "accelerate>=0.26"
+.venv/bin/pip install --upgrade "transformers==4.46.3" "accelerate>=0.26" "soundfile>=0.12"
 rm -f "$TMP_REQ"
 
 echo "=== Verifying ==="

@@ -51,6 +51,12 @@ def main() -> None:
     with np.load(args.codes_npz) as npz:
         keys = list(npz.files)
         print(f"  {len(keys)} entries")
+        if not keys:
+            raise SystemExit(
+                f"ERROR: {args.codes_npz} has 0 entries — upstream extract_encodec "
+                "produced no codes. Check the extraction log for audio-load errors "
+                "(missing torchaudio backend / libsndfile1 / ffmpeg)."
+            )
         rows = []
         for tid in keys:
             codes = npz[tid]
