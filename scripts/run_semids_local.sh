@@ -47,7 +47,36 @@ require data/semantic_ids/discogs_vi_encodec.csv
 require data/semantic_ids/covers80_mert.csv
 require data/semantic_ids/discogs_vi_mert.csv
 require data/splits/covers80_cliques.csv
-require data/splits/discogs_vi_audio.csv
+require data/splits/discogs_vi_subset.csv
+
+# discogs_vi_audio.csv lives on the pod; rebuild it locally from subset CSV +
+# MERT NPZ keys (the embeddings' track_ids are the successfully-crawled set).
+if [ ! -f data/splits/discogs_vi_audio.csv ]; then
+    echo "Deriving data/splits/discogs_vi_audio.csv from local subset CSV + MERT NPZ"
+    python <<'PY'
+import csv
+import numpy as np
+
+with open("data/splits/discogs_vi_subset.csv") as f:
+    subset = {r["youtube_id"]: r["clique_id"] for r in csv.DictReader(f)}
+
+with np.load("data/embeddings/mert/discogs_vi_embeddings.npz") as npz:
+    yids = list(npz.files)
+
+n_ok = 0
+with open("data/splits/discogs_vi_audio.csv", "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=["track_id", "clique_id", "filepath"])
+    w.writeheader()
+    for yid in yids:
+        cid = subset.get(yid)
+        if not cid:
+            continue
+        w.writerow({"track_id": yid, "clique_id": cid, "filepath": ""})
+        n_ok += 1
+print(f"Wrote data/splits/discogs_vi_audio.csv: {n_ok} rows "
+      f"(from {len(yids)} MERT-extracted tracks, {len(subset)} subset rows).")
+PY
+fi
 echo "All upstream artifacts present."
 
 # ----- 1. random-ID baselines -----
