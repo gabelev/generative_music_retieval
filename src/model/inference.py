@@ -93,6 +93,12 @@ def main() -> None:
                         help="JSON output: {query_track_id: [track_id, ...]} ranked.")
     parser.add_argument("--beam-width", type=int, default=20)
     parser.add_argument("--top-k", type=int, default=20)
+    parser.add_argument("--num-beam-groups", type=int, default=4,
+                        help="If >1, use diverse beam search (Vijayakumar et al.). "
+                             "Prevents beams from collapsing to the same high-logit path — "
+                             "critical when the underlying model exhibits mode collapse.")
+    parser.add_argument("--diversity-penalty", type=float, default=0.5,
+                        help="Diverse beam search diversity strength. Ignored if num_beam_groups=1.")
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
 
@@ -142,8 +148,7 @@ def main() -> None:
         for qid, qsem in tqdm(queries.items()):
             input_text = f"{PREFIX} {semid_string(*qsem)}"
             enc = tokenizer(input_text, return_tensors="pt").to(device)
-            outputs = model.generate(
-                **enc,
+            gen_kwargs = dict(
                 num_beams=args.beam_width,
                 num_return_sequences=args.beam_width,
                 max_new_tokens=n_levels + 1,
@@ -151,6 +156,12 @@ def main() -> None:
                 early_stopping=True,
                 do_sample=False,
             )
+            if args.num_beam_groups > 1:
+                gen_kwargs.update(
+                    num_beam_groups=args.num_beam_groups,
+                    diversity_penalty=args.diversity_penalty,
+                )
+            outputs = model.generate(**enc, **gen_kwargs)
             beam_semids = beams_to_semids(outputs, tokenizer, n_levels)
 
             ranked_tracks: list[str] = []

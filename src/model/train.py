@@ -38,9 +38,15 @@ def main() -> None:
                         help="Use 256 for random/mert, 1024 for encodec.")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--lr", type=float, default=1e-4,
+                        help="Lowered from 5e-4: T5-small with extended vocab + small dataset "
+                             "exhibits mode collapse at 5e-4. 1e-4 trains gentler.")
     parser.add_argument("--weight-decay", type=float, default=0.01)
-    parser.add_argument("--warmup-steps", type=int, default=200)
+    parser.add_argument("--warmup-steps", type=int, default=500,
+                        help="Bumped from 200: extended vocab benefits from a longer warmup.")
+    parser.add_argument("--label-smoothing", type=float, default=0.1,
+                        help="Softens targets so the model can't peg all its mass on one token "
+                             "per position — mitigates mode collapse.")
     parser.add_argument("--early-stopping-patience", type=int, default=3)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--precision", default="auto", choices=["auto", "fp32", "fp16", "bf16"],
@@ -93,6 +99,7 @@ def main() -> None:
         learning_rate=args.lr,
         weight_decay=args.weight_decay,
         warmup_steps=args.warmup_steps,
+        label_smoothing_factor=args.label_smoothing,
         logging_steps=50,
         eval_strategy="epoch",
         save_strategy="epoch",

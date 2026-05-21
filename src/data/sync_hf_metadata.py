@@ -31,7 +31,7 @@ DEFAULT_PATHS = [
     "runs",
     "docs/RESULTS.md",
 ]
-DEFAULT_PATTERNS = ["*.csv", "*.pkl", "*.json", "*.md"]
+DEFAULT_PATTERNS = ["*.csv", "*.pkl", "*.json", "*.md", "*.safetensors", "*.bin"]
 
 
 def main() -> None:

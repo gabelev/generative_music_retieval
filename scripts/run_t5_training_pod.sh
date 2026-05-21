@@ -30,7 +30,10 @@ EPOCHS=${EPOCHS:-15}
 BATCH=${BATCH:-64}
 BEAM=${BEAM:-20}
 TOP_K=${TOP_K:-20}
-PUSH_RESULTS=${PUSH_RESULTS:-1}     # if 1, push runs/preds + RESULTS.md back to HF at the end
+BEAM_GROUPS=${BEAM_GROUPS:-4}        # >1 enables diverse beam search (anti-mode-collapse)
+DIVERSITY=${DIVERSITY:-0.5}
+SKIP_TRAIN=${SKIP_TRAIN:-0}          # if 1, only re-run inference on existing checkpoints
+PUSH_RESULTS=${PUSH_RESULTS:-1}      # if 1, push runs/preds + RESULTS.md back to HF at the end
 
 banner() { echo; echo "=== $1 ==="; }
 
@@ -40,22 +43,27 @@ python -m src.data.sync_hf_metadata --hf-repo "$HF_REPO" --mode download
 run_condition() {
     local cond="$1"
     local codebook_size="$2"
-    banner "Training: $cond (codebook ${codebook_size})"
-    python -m src.model.train \
-        --train-csv "data/splits/discogs_vi_${cond}_ids_train.csv" \
-        --val-csv   "data/splits/discogs_vi_${cond}_ids_val.csv" \
-        --out-dir   "runs/t5_${cond}" \
-        --codebook-size "$codebook_size" \
-        --epochs "$EPOCHS" \
-        --batch-size "$BATCH"
+    if [ "$SKIP_TRAIN" != "1" ]; then
+        banner "Training: $cond (codebook ${codebook_size})"
+        python -m src.model.train \
+            --train-csv "data/splits/discogs_vi_${cond}_ids_train.csv" \
+            --val-csv   "data/splits/discogs_vi_${cond}_ids_val.csv" \
+            --out-dir   "runs/t5_${cond}" \
+            --codebook-size "$codebook_size" \
+            --epochs "$EPOCHS" \
+            --batch-size "$BATCH"
+    else
+        banner "SKIP_TRAIN=1: reusing existing checkpoint at runs/t5_${cond}"
+    fi
 
-    banner "Inference (in-distribution test): $cond"
+    banner "Inference (in-distribution test): $cond (beam=$BEAM, groups=$BEAM_GROUPS, div=$DIVERSITY)"
     python -m src.model.inference \
         --ckpt-dir   "runs/t5_${cond}" \
         --test-csv   "data/splits/discogs_vi_${cond}_ids_test.csv" \
         --semids-csv "data/semantic_ids/discogs_vi_${cond}.csv" \
         --out        "runs/preds_discogs_vi_${cond}.json" \
-        --beam-width "$BEAM" --top-k "$TOP_K"
+        --beam-width "$BEAM" --top-k "$TOP_K" \
+        --num-beam-groups "$BEAM_GROUPS" --diversity-penalty "$DIVERSITY"
 
     banner "Inference (cross-dataset, Covers80): $cond"
     # Build a synthetic test CSV from covers80_cliques + covers80 SemIDs so
@@ -93,7 +101,8 @@ PY
         --test-csv   "data/splits/covers80_${cond}_test.csv" \
         --semids-csv "data/semantic_ids/covers80_${cond}.csv" \
         --out        "runs/preds_covers80_${cond}.json" \
-        --beam-width "$BEAM" --top-k "$TOP_K"
+        --beam-width "$BEAM" --top-k "$TOP_K" \
+        --num-beam-groups "$BEAM_GROUPS" --diversity-penalty "$DIVERSITY"
 }
 
 run_condition random  256
