@@ -36,6 +36,10 @@ def main() -> None:
     parser.add_argument("--train-frac", type=float, default=0.70)
     parser.add_argument("--val-frac", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--split-by", choices=["pair", "clique"], default="pair",
+                        help="pair (default): transductive/DSI-style — every clique is in the "
+                             "corpus, individual (query->cover) pairs are held out. "
+                             "clique: inductive/cold-start — entire cliques held out (much harder).")
     args = parser.parse_args()
 
     # Load SemIDs
@@ -58,19 +62,54 @@ def main() -> None:
     dropped = len(by_clique) - len(usable)
     print(f"Cliques: {len(by_clique)} total, {len(usable)} usable (>=2 tracks), {dropped} dropped")
 
-    # Clique-level split
     rng = random.Random(args.seed)
-    clique_ids = sorted(usable.keys())
-    rng.shuffle(clique_ids)
-    n = len(clique_ids)
-    n_train = int(args.train_frac * n)
-    n_val = int(args.val_frac * n)
-    splits = {
-        "train": clique_ids[:n_train],
-        "val": clique_ids[n_train : n_train + n_val],
-        "test": clique_ids[n_train + n_val :],
-    }
-    print(f"Split: train={len(splits['train'])}, val={len(splits['val'])}, test={len(splits['test'])} cliques")
+
+    def all_pairs(cid: str) -> list[dict]:
+        rows = []
+        tracks = usable[cid]
+        for q in tracks:
+            for t in tracks:
+                if q == t:
+                    continue
+                qs, ts = semids[q], semids[t]
+                rows.append({
+                    "clique_id": cid,
+                    "query_track_id": q, "target_track_id": t,
+                    "query_c1": qs[0], "query_c2": qs[1], "query_c3": qs[2],
+                    "target_c1": ts[0], "target_c2": ts[1], "target_c3": ts[2],
+                })
+        return rows
+
+    splits: dict[str, list[dict]] = {"train": [], "val": [], "test": []}
+
+    if args.split_by == "clique":
+        # Inductive / cold-start: whole cliques go to one split.
+        clique_ids = sorted(usable.keys())
+        rng.shuffle(clique_ids)
+        n = len(clique_ids)
+        n_train = int(args.train_frac * n)
+        n_val = int(args.val_frac * n)
+        assign = ({c: "train" for c in clique_ids[:n_train]}
+                  | {c: "val" for c in clique_ids[n_train:n_train + n_val]}
+                  | {c: "test" for c in clique_ids[n_train + n_val:]})
+        for cid in clique_ids:
+            splits[assign[cid]].extend(all_pairs(cid))
+        print(f"Clique split: train={n_train}, val={n_val}, test={n - n_train - n_val} cliques")
+    else:
+        # Transductive (DSI/TIGER-style): every clique contributes pairs to every
+        # split, with >=1 pair guaranteed in train so each track is indexed.
+        for cid in sorted(usable.keys()):
+            pairs = all_pairs(cid)
+            rng.shuffle(pairs)
+            n = len(pairs)
+            n_train = max(1, int(args.train_frac * n))
+            n_val = int(args.val_frac * n)
+            # never let val/test eat the only pairs
+            n_val = min(n_val, max(0, n - n_train))
+            splits["train"].extend(pairs[:n_train])
+            splits["val"].extend(pairs[n_train:n_train + n_val])
+            splits["test"].extend(pairs[n_train + n_val:])
+        print(f"Pair split (transductive): every clique in corpus; pairs held out per-clique")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -82,30 +121,15 @@ def main() -> None:
     ]
 
     total_pairs = 0
-    for split_name, cids in splits.items():
+    for split_name, rows in splits.items():
         out_path = out_dir / f"{args.name}_{split_name}.csv"
         with out_path.open("w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
-            split_pairs = 0
-            for cid in cids:
-                tracks = usable[cid]
-                for q in tracks:
-                    for t in tracks:
-                        if q == t:
-                            continue
-                        qs = semids[q]
-                        ts = semids[t]
-                        w.writerow({
-                            "clique_id": cid,
-                            "query_track_id": q,
-                            "target_track_id": t,
-                            "query_c1": qs[0], "query_c2": qs[1], "query_c3": qs[2],
-                            "target_c1": ts[0], "target_c2": ts[1], "target_c3": ts[2],
-                        })
-                        split_pairs += 1
-        total_pairs += split_pairs
-        print(f"  {split_name}: {split_pairs} ordered pairs -> {out_path.name}")
+            w.writerows(rows)
+        total_pairs += len(rows)
+        n_q = len({r["query_track_id"] for r in rows})
+        print(f"  {split_name}: {len(rows)} pairs, {n_q} unique queries -> {out_path.name}")
 
     print(f"Total ordered pairs: {total_pairs}")
 
