@@ -34,6 +34,12 @@ BEAM_GROUPS=${BEAM_GROUPS:-4}        # >1 enables diverse beam search (anti-mode
 DIVERSITY=${DIVERSITY:-0.5}
 SKIP_TRAIN=${SKIP_TRAIN:-0}          # if 1, only re-run inference on existing checkpoints
 PUSH_RESULTS=${PUSH_RESULTS:-1}      # if 1, push runs/preds + RESULTS.md back to HF at the end
+# SPLIT_TAG selects which split family to train/eval on:
+#   ids    -> transductive pair-split (default, the main result)
+#   clique -> inductive clique-split (cold-start experiment)
+SPLIT_TAG=${SPLIT_TAG:-ids}
+SUFFIX=""
+[ "$SPLIT_TAG" != "ids" ] && SUFFIX="_${SPLIT_TAG}"
 
 banner() { echo; echo "=== $1 ==="; }
 
@@ -44,27 +50,31 @@ run_condition() {
     local cond="$1"
     local codebook_size="$2"
     if [ "$SKIP_TRAIN" != "1" ]; then
-        banner "Training: $cond (codebook ${codebook_size})"
+        banner "Training: $cond (codebook ${codebook_size}, split=${SPLIT_TAG})"
         python -m src.model.train \
-            --train-csv "data/splits/discogs_vi_${cond}_ids_train.csv" \
-            --val-csv   "data/splits/discogs_vi_${cond}_ids_val.csv" \
-            --out-dir   "runs/t5_${cond}" \
+            --train-csv "data/splits/discogs_vi_${cond}_${SPLIT_TAG}_train.csv" \
+            --val-csv   "data/splits/discogs_vi_${cond}_${SPLIT_TAG}_val.csv" \
+            --out-dir   "runs/t5_${cond}${SUFFIX}" \
             --codebook-size "$codebook_size" \
             --epochs "$EPOCHS" \
             --batch-size "$BATCH"
     else
-        banner "SKIP_TRAIN=1: reusing existing checkpoint at runs/t5_${cond}"
+        banner "SKIP_TRAIN=1: reusing existing checkpoint at runs/t5_${cond}${SUFFIX}"
     fi
 
-    banner "Inference (in-distribution test): $cond (beam=$BEAM, groups=$BEAM_GROUPS, div=$DIVERSITY)"
+    banner "Inference (in-distribution test): $cond (split=${SPLIT_TAG}, beam=$BEAM, groups=$BEAM_GROUPS)"
     python -m src.model.inference \
-        --ckpt-dir   "runs/t5_${cond}" \
-        --test-csv   "data/splits/discogs_vi_${cond}_ids_test.csv" \
+        --ckpt-dir   "runs/t5_${cond}${SUFFIX}" \
+        --test-csv   "data/splits/discogs_vi_${cond}_${SPLIT_TAG}_test.csv" \
         --semids-csv "data/semantic_ids/discogs_vi_${cond}.csv" \
-        --out        "runs/preds_discogs_vi_${cond}.json" \
+        --out        "runs/preds_discogs_vi_${cond}${SUFFIX}.json" \
         --beam-width "$BEAM" --top-k "$TOP_K" \
         --num-beam-groups "$BEAM_GROUPS" --diversity-penalty "$DIVERSITY"
 
+    # Covers80 cross-dataset inference only applies to the transductive run.
+    if [ "$SPLIT_TAG" != "ids" ]; then
+        return 0
+    fi
     banner "Inference (cross-dataset, Covers80): $cond"
     # Build a synthetic test CSV from covers80_cliques + covers80 SemIDs so
     # inference treats every Covers80 track as a query against the Covers80 SemID pool.

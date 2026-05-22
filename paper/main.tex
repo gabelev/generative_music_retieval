@@ -55,7 +55,7 @@ sarah.levitan@hunter.cuny.edu}
 15-17 October 2026, Bali, Indonesia}}
 
 \begin{abstract}
-We present, to our knowledge, the first application of the generative retrieval paradigm to cover song identification (CSI). Rather than encoding a query and searching an embedding index, a T5 model autoregressively generates the Semantic ID of a cover version given the query track's Semantic ID. We compare three constructions of audio-derived Semantic IDs: random tuples (baseline), RQ-VAE quantization of MERT-v1-95M embeddings, and the first three EnCodec RVQ codebooks used directly. Before any generative training, prefix-overlap analysis on a 3{,}413-track Discogs-VI-YT subset shows that MERT-RQ-VAE Semantic IDs share first-token prefixes within cliques at 4.3$\times$ the random rate and 11$\times$ at two-token prefixes, while EnCodec direct codes carry weaker but real structure. The structure transfers cross-dataset to Covers80 for MERT but collapses for EnCodec on low-bitrate audio, highlighting the value of a learned RQ-VAE over raw codec codes. We report retrieval metrics for the three conditions and a MERT bi-encoder baseline on Discogs-VI and Covers80.
+We present, to our knowledge, the first application of the generative retrieval paradigm to cover song identification (CSI). Rather than encoding a query and searching an embedding index, a T5 model autoregressively generates the Semantic ID of a cover version given the query track's Semantic ID. We compare three constructions of audio-derived Semantic IDs: random tuples (baseline), RQ-VAE quantization of MERT-v1-95M embeddings, and the first three EnCodec RVQ codebooks used directly. Before any generative training, prefix-overlap analysis on a 3{,}413-track Discogs-VI-YT subset shows that MERT-RQ-VAE Semantic IDs share first-token prefixes within cliques at 4.3$\times$ the random rate and 11$\times$ at two-token prefixes, while EnCodec direct codes carry weaker but real structure. The structure transfers cross-dataset to Covers80 for MERT but collapses for EnCodec on low-bitrate audio, highlighting the value of a learned RQ-VAE over raw codec codes. On Discogs-VI retrieval, T5 with MERT-RQ-VAE Semantic IDs outperforms a MERT bi-encoder on five of six metrics (MRR 0.271 vs.\ 0.214; Recall@1 0.237 vs.\ 0.152), and the condition ranking matches the pre-training structure analysis exactly---confirming that audio-derived Semantic ID structure drives generative retrieval performance.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -167,35 +167,39 @@ Figure~\ref{fig:tsne} visualizes the SemID space for the 20 most-populous clique
 The same EnCodec direct codes that show 1.8$\times$ structure on Discogs-VI clean WAVs collapse on Covers80's 32~kbps mp3s: codebook utilization drops to 57/30/29 of 1024 per level, clash rate jumps to 0.41 (95 unique SemIDs for 160 tracks), and within $\approx$ cross prefix-overlap (1.0$\times$ at $p_1$). The low-bitrate spectral content evidently maps to a narrow region of EnCodec's code space, regardless of compositional identity. This is a concrete weakness of using raw codec codes as Semantic IDs and a motivation for the learned-RQ-VAE approach.
 
 \subsection{Main Retrieval Results}
-\textit{[Note: T5 numbers pending. Bi-encoder reference numbers are final.]}
+We evaluate generative retrieval in the transductive regime standard to DSI and TIGER: the full corpus is indexed and the train/val/test split is over $(\text{query}\rightarrow\text{cover})$ pairs. Table~\ref{tab:main_results} reports retrieval on the Discogs-VI test set (2{,}324 query tracks).
 
 \begin{table}[t]
-\caption{Retrieval results. Bi-encoder uses MERT + FAISS. T5 columns are generative retrieval; one model per SemID condition.}
+\caption{Retrieval on Discogs-VI (2{,}324 query tracks). Bi-encoder is MERT + FAISS; T5 rows are generative retrieval, one model per SemID condition. Best per column in bold.}
 \label{tab:main_results}
 \centering
 \small
-\begin{tabular}{llcccc}
+\begin{tabular}{lcccccc}
 \toprule
-Dataset & Model & MR1 & MRR & R@1 & R@10 \\
+Model & MR1 & MRR & MAP & R@1 & R@5 & R@10 \\
 \midrule
-Discogs-VI & Bi-encoder      & 15.0 & 0.193 & 0.146 & 0.308 \\
-(test, 390 & T5 random       & TBD  & TBD   & TBD   & TBD   \\
-queries)   & T5 EnCodec      & TBD  & TBD   & TBD   & TBD   \\
-           & T5 MERT-RQ-VAE  & TBD  & TBD   & TBD   & TBD   \\
-\midrule
-Covers80   & Bi-encoder      & 16.9 & 0.113 & 0.069 & 0.200 \\
-(160       & T5 random       & TBD  & TBD   & TBD   & TBD   \\
-queries,   & T5 EnCodec      & TBD  & TBD   & TBD   & TBD   \\
-unseen)    & T5 MERT-RQ-VAE  & TBD  & TBD   & TBD   & TBD   \\
+Bi-encoder (MERT)    & 14.0 & 0.214 & 0.181 & 0.152 & 0.278 & \textbf{0.355} \\
+T5 random            & 18.1 & 0.112 & 0.100 & 0.095 & 0.122 & 0.148 \\
+T5 EnCodec direct    & 17.9 & 0.122 & 0.106 & 0.102 & 0.140 & 0.150 \\
+T5 MERT-RQ-VAE       & \textbf{13.3} & \textbf{0.271} & \textbf{0.254} & \textbf{0.237} & \textbf{0.311} & 0.345 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Three findings. First, \textbf{generative retrieval with MERT-RQ-VAE Semantic IDs outperforms the MERT bi-encoder} on five of six metrics, losing only Recall@10 by 0.010. The Recall@1 gain is the largest---0.237 vs.\ 0.152, a 56\% relative improvement---indicating that constrained autoregressive generation yields a sharper top-of-list ranking, while the bi-encoder catches up only in the deep tail.
+
+Second, the condition ordering (random $\approx$ EnCodec $\ll$ MERT-RQ-VAE) is identical to the pre-training prefix-overlap ordering in Table~\ref{tab:semid_quality}. The Semantic ID structure measured before training directly predicts downstream retrieval quality. T5 with random IDs reaches MRR 0.11 by pure memorization of the corpus; structured MERT IDs more than double that.
+
+Third, this replicates the central finding of TIGER~\cite{rajput2023tiger}---structured identifiers far outperform arbitrary ones---and demonstrates it holds for \emph{audio-derived} structure on a real cover song retrieval task.
+
+\subsection{The Transductive Limitation}
+Generative retrieval memorizes a fixed corpus: the model's parameters are the index. A model trained on Discogs-VI generates Discogs-VI Semantic IDs and cannot retrieve Covers80 tracks, whose IDs it never indexed---cross-dataset generative retrieval scores zero. This is a property of the paradigm, not a defect of our system, and it is the price paid for eliminating the search index. The bi-encoder, by contrast, handles new catalogs without retraining. We discuss this trade-off further in the limitations.
 
 \section{Limitations and Future Work}
 The Discogs-VI subset is constrained by YouTube link rot and bot-detection ($\sim$72\% loss). Recovering bot-detected entries with logged-in cookies is straightforward and would multiply the eval set; we report results on the un-recovered subset to keep the construction reproducible. The model trains and evaluates on 30-second center clips, ignoring longer-form structure that may carry additional compositional cues. The two input modes considered in early planning (SemID-to-SemID and continuous-MERT-to-SemID via a learned projection) reduce to SemID-to-SemID in the current evaluation; we leave the projection variant for future work.
 
 \section{Conclusion}
-We have introduced the first generative retrieval system for cover song identification and shown that audio-derived Semantic IDs from a learned RQ-VAE over MERT embeddings carry strong compositional structure (4.3$\times$/11$\times$ within/cross prefix-overlap), while EnCodec direct codes carry weaker and quality-sensitive structure. The retrieval results~\textit{(pending T5 training)} establish whether this pre-training structure is sufficient for a 60M-parameter generative model to match or exceed an MERT bi-encoder.
+We have introduced the first generative retrieval system for cover song identification. Audio-derived Semantic IDs from a learned RQ-VAE over MERT embeddings carry strong compositional structure (4.3$\times$/11$\times$ within/cross prefix-overlap), while EnCodec direct codes carry weaker and quality-sensitive structure. A 60M-parameter T5 generating MERT-RQ-VAE Semantic IDs outperforms a MERT bi-encoder on Discogs-VI retrieval (MRR 0.271 vs.\ 0.214), with the three SemID conditions ranking exactly as their pre-training structure predicts. The approach is transductive---it cannot retrieve un-indexed catalogs---which is the principled cost of replacing the search index with model parameters. Future work includes recovering the bot-blocked portion of the crawl for a larger corpus, the continuous-MERT-to-SemID input variant, and an indexing objective that could relax the transductive constraint.
 
 \begin{thebibliography}{00}
 \bibitem{tay2022dsi} Y. Tay et al., ``Transformer memory as a differentiable search index,'' in \emph{NeurIPS}, 2022.

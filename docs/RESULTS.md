@@ -110,31 +110,38 @@ Reports: `runs/metrics_biencoder_{discogs_vi,covers80}.json`.
 
 ---
 
-## 4. T5 generative retrieval — *pending pod run*
+## 4. T5 generative retrieval
 
-For each SemID condition, T5-small is fine-tuned to autoregressively generate a cover's SemID given the query's SemID, then evaluated with constrained beam search (beam width 20, position i restricted to `<Li_C*>` tokens).
+For each SemID condition, T5-small is fine-tuned to autoregressively generate a cover's SemID given the query's SemID, then evaluated with constrained beam search (beam width 20, 4 diverse beam groups, position i restricted to `<Li_C*>` tokens).
 
 - **Training script**: `src/model/train.py` (HuggingFace `Seq2SeqTrainer`, early stop on val loss, patience 3)
 - **Inference script**: `src/model/inference.py`
 - **Driver**: `scripts/run_t5_training_pod.sh`
+- **Evaluation regime**: transductive (DSI/TIGER-style) — the full Discogs-VI corpus is indexed; train/val/test split is on `(query→cover)` pairs (`build_splits.py --split-by pair`).
 
-### 4.1 Discogs-VI in-distribution test (105 cliques, ~390 queries)
+### 4.1 Two bugs found and fixed (runs 1-2 mode-collapsed)
 
-| condition | MR1 | MRR | MAP | R@1 | R@5 | R@10 |
+The first two training runs collapsed (the model emitted a single constant SemID for every query). Root causes:
+
+1. **Embedding init.** HF `resize_token_embeddings` mean-initializes new tokens, so all 768 SemID tokens started *identical* — the encoder produced byte-identical output for every query. Fixed by `_reinit_semid_embeddings()`, which samples each SemID embedding from the original vocabulary's per-dimension Gaussian.
+2. **Split design.** The original clique-level split left test cliques entirely unseen; generative retrieval cannot retrieve an un-indexed corpus. Fixed by the transductive pair-split.
+
+Run 3 (LR 3e-4, label smoothing 0, embedding re-init, pair-split) trained correctly: MERT predicts 850 distinct tracks across 2,324 queries (vs. 1 in the collapsed runs).
+
+### 4.2 Discogs-VI in-distribution test (2,324 query tracks)
+
+| Model | MR1 | MRR | MAP | R@1 | R@5 | R@10 |
 |---|---|---|---|---|---|---|
-| Bi-encoder (reference) | 15.05 | 0.193 | 0.178 | 0.146 | 0.246 | 0.308 |
-| T5 random | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| T5 MERT-RQ-VAE | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| T5 EnCodec | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+| Bi-encoder (MERT + FAISS) | 14.0 | 0.214 | 0.181 | 0.152 | 0.278 | **0.355** |
+| T5 random          | 18.1 | 0.112 | 0.100 | 0.095 | 0.122 | 0.148 |
+| T5 EnCodec direct  | 17.9 | 0.122 | 0.106 | 0.102 | 0.140 | 0.150 |
+| **T5 MERT-RQ-VAE** | **13.3** | **0.271** | **0.254** | **0.237** | **0.311** | 0.345 |
 
-### 4.2 Covers80 cross-dataset test (80 cliques, 160 queries; model never saw any Covers80 track during training)
+T5 MERT-RQ-VAE beats the bi-encoder on MR1, MRR, MAP, R@1, R@5; loses R@10 by 0.010. The R@1 gain is the headline: 0.237 vs 0.152 (+56% relative). The condition ordering (random ≈ EnCodec ≪ MERT) matches the pre-training SemID prefix-overlap ordering exactly — structured audio-derived IDs are what carries generative retrieval.
 
-| condition | MR1 | MRR | MAP | R@1 | R@5 | R@10 |
-|---|---|---|---|---|---|---|
-| Bi-encoder (reference) | 16.90 | 0.113 | 0.113 | 0.069 | 0.156 | 0.200 |
-| T5 random | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| T5 MERT-RQ-VAE | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| T5 EnCodec | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+### 4.3 Covers80 cross-dataset: not applicable to generative retrieval
+
+The model memorizes the Discogs-VI corpus and generates Discogs-VI SemIDs; Covers80 tracks carry SemIDs the model never indexed, so all cross-dataset generative-retrieval lookups miss (metrics all zero). This is a property of the generative-retrieval paradigm — it is inherently transductive — not a bug. Covers80 therefore serves only as (a) the cross-dataset SemID-structure check (§2.2) and (b) the bi-encoder cross-dataset baseline (§3). The transductive limitation is a Discussion/Limitations point in the paper.
 
 ---
 

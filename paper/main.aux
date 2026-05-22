@@ -20,7 +20,6 @@
 \@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Generative Retrieval}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Cover Song Identification}{1}{}\protected@file@percent }
 \citation{defossez2022encodec}
 \citation{lee2022rqvae,zeghidour2021soundstream}
 \citation{yuan2023mert}
@@ -28,6 +27,7 @@
 \citation{raffel2020t5}
 \citation{araz2024discogsvi}
 \citation{ellis2007covers80}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Cover Song Identification}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Discrete Audio Representations}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {III}Method}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Task Formulation}{2}{}\protected@file@percent }
@@ -39,19 +39,18 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Baselines and Metrics}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {V}Results and Analysis}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Semantic ID Structure Before Training}{2}{}\protected@file@percent }
+\citation{rajput2023tiger}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Within- vs cross-clique prefix-share rates on Discogs-VI for the three SemID conditions. Bar height is the fraction of pairs sharing the indicated prefix; annotated multiplier on each within bar is the within/cross ratio. Random IDs sit at the noise floor (1.06$\times $); MERT-RQ-VAE encodes compositional structure most strongly.}}{3}{}\protected@file@percent }
 \newlabel{fig:prefix_overlap}{{1}{3}{}{figure.1}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Semantic ID quality on Discogs-VI (3{,}413 tracks). Within/cross is the ratio of prefix-share rates inside vs.\ across cliques. Higher = more compositional structure encoded.}}{3}{}\protected@file@percent }
 \newlabel{tab:semid_quality}{{I}{3}{}{table.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Cross-Dataset Structure Transfer}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}EnCodec Collapses on Low-Bitrate Audio}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Main Retrieval Results}{3}{}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces t-SNE projection of MERT-RQ-VAE Semantic IDs (codebook-expanded) for the 20 most-populous Discogs-VI cliques. Tracks within a clique are colored alike; visible coloring suggests that the SemID code space separates cliques to a meaningful extent.}}{3}{}\protected@file@percent }
 \newlabel{fig:tsne}{{2}{3}{}{figure.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Retrieval results. Bi-encoder uses MERT + FAISS. T5 columns are generative retrieval; one model per SemID condition.}}{3}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Retrieval on Discogs-VI (2{,}324 query tracks). Bi-encoder is MERT + FAISS; T5 rows are generative retrieval, one model per SemID condition. Best per column in bold.}}{3}{}\protected@file@percent }
 \newlabel{tab:main_results}{{II}{3}{}{table.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {VI}Limitations and Future Work}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Main Retrieval Results}{3}{}\protected@file@percent }
 \bibcite{tay2022dsi}{1}
 \bibcite{rajput2023tiger}{2}
 \bibcite{palumbo2025text2tracks}{3}
@@ -67,5 +66,8 @@
 \bibcite{lee2022rqvae}{13}
 \bibcite{zeghidour2021soundstream}{14}
 \bibcite{raffel2020t5}{15}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}The Transductive Limitation}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Limitations and Future Work}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion}{4}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{References}{4}{}\protected@file@percent }
 \gdef \@abspage@last{4}
