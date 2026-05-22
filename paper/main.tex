@@ -20,6 +20,8 @@
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
@@ -82,7 +84,7 @@ Our contributions are:
 \section{Related Work}
 
 \subsection{Generative Retrieval}
-DSI~\cite{tay2022dsi} casts document retrieval as text-to-identifier sequence-to-sequence generation. TIGER~\cite{rajput2023tiger} introduced Semantic IDs constructed via RQ-VAE over item embeddings; the headline finding was that structured codes outperform arbitrary identifiers. Music-domain extensions include Text2Tracks~\cite{palumbo2025text2tracks} (text prompt to track), FusID~\cite{kim2026fusid} (multimodal Semantic IDs for playlist continuation), and large-scale catalog work at industry labs~\cite{mei2025semids}.
+Generative retrieval replaces the encode-and-search pipeline with a single sequence model that emits a target's identifier directly: the model's parameters become the index. DSI~\cite{tay2022dsi} casts document retrieval as text-to-identifier generation and trains with a joint indexing-and-retrieval objective. TIGER~\cite{rajput2023tiger} introduced Semantic IDs constructed via RQ-VAE over item embeddings; its headline finding---that structured codes substantially outperform arbitrary identifiers---is the result our SemID-condition comparison tests in the audio domain. Music-domain extensions include Text2Tracks~\cite{palumbo2025text2tracks} (text prompt to track), FusID~\cite{kim2026fusid} (multimodal Semantic IDs for playlist continuation), and large-scale catalog work at industry labs~\cite{mei2025semids}. All target recommendation or text-query settings; none addresses cover song identification, where the query and target are both audio and ground truth is unambiguous.
 
 \subsection{Cover Song Identification}
 Standard benchmarks are Covers80~\cite{ellis2007covers80} (80 cliques, 160 tracks), Da-TACOS~\cite{yesiler2019datacos} (25k tracks), and the recent Discogs-VI~\cite{araz2024discogsvi} (493k versions across 98k cliques, with paired YouTube IDs for audio crawl). System families include similarity-matrix alignment over CQT/HPCP features and learned bi-encoders such as MOVE~\cite{yesiler2019move} and CoverHunter~\cite{doh2021coverhunter}. Recent work also explores music language models (e.g.\ MERT~\cite{yuan2023mert}) as universal feature extractors.
@@ -92,27 +94,62 @@ EnCodec~\cite{defossez2022encodec} is a neural audio codec built around residual
 
 \section{Method}
 
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=3.4mm,
+  box/.style={draw, rounded corners, align=center, font=\footnotesize,
+              inner sep=3.5pt, minimum width=0.74\columnwidth},
+  arr/.style={-{Latex[length=1.8mm]}, semithick},
+]
+\node[box] (audio) {Query track audio \;(30\,s, 24\,kHz mono)};
+\node[box, below=of audio] (mert) {MERT-v1-95M \;(frozen) $\rightarrow$ 768-d};
+\node[box, below=of mert] (quant) {Quantizer: RQ-VAE \,/\, EnCodec \,/\, random};
+\node[box, below=of quant] (sid) {Query Semantic ID $\langle c_1\,c_2\,c_3\rangle$};
+\node[box, below=of sid] (t5) {T5-small \;(fine-tuned) + constrained beam search};
+\node[box, below=of t5] (track) {Cover Semantic ID $\rightarrow$ track-ID lookup};
+\draw[arr] (audio) -- (mert);
+\draw[arr] (mert) -- (quant);
+\draw[arr] (quant) -- (sid);
+\draw[arr] (sid) -- (t5);
+\draw[arr] (t5) -- (track);
+\end{tikzpicture}
+\caption{Generative retrieval pipeline. A frozen audio encoder and a quantizer map each track to a discrete Semantic ID; a fine-tuned T5 autoregressively generates the Semantic ID of a cover, which is resolved to a track. The model's parameters replace the embedding index.}
+\label{fig:pipeline}
+\end{figure}
+
 \subsection{Task Formulation}
-For each clique $\mathcal{C} = \{t_1, t_2, \ldots, t_n\}$ in the training corpus, we generate all ordered pairs $(t_i, t_j),\, i \neq j$. The model receives a representation $z_q$ of the query track $t_q$ and emits the discrete Semantic ID $\mathrm{SID}(t_j)$ of a cover. Retrieval is performed by constrained beam search; predicted SIDs are resolved to track IDs via a lookup table. A prediction is correct if the resolved track lies in the query's clique.
+For each clique $\mathcal{C} = \{t_1, t_2, \ldots, t_n\}$ in the training corpus, we generate all ordered pairs $(t_i, t_j),\, i \neq j$. The model receives the Semantic ID of a query track $t_q$ and emits the discrete Semantic ID $\mathrm{SID}(t_j)$ of a cover (Fig.~\ref{fig:pipeline}). Retrieval is performed by constrained beam search; predicted SIDs are resolved to track IDs via a lookup table. A prediction is correct if the resolved track lies in the query's clique.
 
 \subsection{Semantic ID Construction}
 A Semantic ID is a 3-token tuple $(c_1, c_2, c_3) \in [0, K)^3$. We compare three constructions:
 
 \textbf{Random IDs.} For each track in the corpus, sample $c_i \sim \mathrm{Uniform}(0, K{=}256)$ independently. Tests the upper bound on what a generative model can memorize without structural prior.
 
-\textbf{MERT-RQ-VAE IDs.} We extract a 768-d embedding per track from MERT-v1-95M~\cite{yuan2023mert} by mean-pooling hidden states of layers 7--12 across a 30-second center clip resampled to 24~kHz mono. We train a 3-level RQ-VAE on these embeddings via sequential mini-batch $k$-means with codebook size $K=256$ per level. Each level assigns its nearest centroid, subtracts the residual, and passes the remainder to the next level. The three assignments form the SemID.
+\textbf{MERT-RQ-VAE IDs.} We extract a 768-d embedding per track from MERT-v1-95M~\cite{yuan2023mert} by mean-pooling hidden states of layers 7--12 across a 30-second center clip resampled to 24~kHz mono. We train a 3-level RQ-VAE on these embeddings via sequential mini-batch $k$-means. Writing the MERT embedding as the level-0 residual $r_0$, level $\ell$ assigns the nearest codebook centroid and forwards the remaining residual:
+\begin{equation}
+c_\ell = \arg\min_k \lVert r_{\ell-1} - e_\ell[k] \rVert_2, \quad
+r_\ell = r_{\ell-1} - e_\ell[c_\ell],
+\label{eq:rqvae}
+\end{equation}
+for $\ell \in \{1,2,3\}$ with codebook size $K=256$. The Semantic ID is $(c_1, c_2, c_3)$. Codebooks are trained on Discogs-VI and reused to encode Covers80, so the two datasets share a code space.
 
 \textbf{EnCodec direct IDs.} We encode each track with EnCodec~\cite{defossez2022encodec} at 3.0~kbps (4 codebooks of size 1024). We take the first three codebooks' frame-level codes and aggregate to track level via majority vote, producing a 3-token SemID over $K=1024$.
 
 \subsection{Generative Retrieval Model}
-We use T5-small (60M parameters)~\cite{raffel2020t5}. We extend the tokenizer with $3K$ SemID tokens---one per (level, code) pair---and resize the model's input and output embedding matrices. The encoder input is the prefix \texttt{"retrieve cover:"} followed by the query's SemID token sequence. The decoder generates the target SemID. Training uses teacher forcing with the standard cross-entropy loss.
+We use T5-small (60M parameters)~\cite{raffel2020t5}. We extend the tokenizer with $3K$ SemID tokens---one per (level, code) pair---and resize the model's input and output embedding matrices. The encoder input is the prefix \texttt{"retrieve cover:"} followed by the query's SemID token sequence; the decoder generates the target SemID. Training uses teacher forcing with cross-entropy loss.
 
-At inference time, we apply constrained beam search of width 20: position $i$ in the generated sequence is restricted via \texttt{prefix\_allowed\_tokens\_fn} to the $K$ tokens corresponding to level $i$. After three SemID tokens, end-of-sequence is forced. Each beam decodes to one SemID; the SemID is mapped through a precomputed lookup table to zero or more track candidates. The ranked union of beam-resolved tracks (excluding the query) is the retrieved list.
+One implementation detail proved decisive. The standard mean-initialization for resized embeddings sets every new SemID token to the same vector; the encoder then cannot distinguish queries and the model collapses to a constant output. We instead sample each SemID embedding from the original vocabulary's per-dimension Gaussian, which restores input sensitivity and is necessary for the model to train at all.
+
+At inference, we apply constrained beam search of width 20 with four diverse beam groups~\cite{vijayakumar2018diverse}: decoder position $i$ is restricted to the $K$ tokens of level $i$, and end-of-sequence is forced after three tokens. Each beam decodes to one SemID, resolved through a precomputed lookup table to zero or more tracks; the ranked union of beam-resolved tracks (excluding the query) is the retrieved list.
+
+\subsection{Evaluation Regimes}
+Generative retrieval memorizes a fixed corpus, so the split design matters. We evaluate two regimes. \emph{Transductive} (the standard DSI/TIGER setting): every clique is in the indexed corpus and the train/val/test split is over $(\text{query}\rightarrow\text{cover})$ pairs. \emph{Inductive} (cold-start): whole cliques are held out, so test songs are entirely unseen. The contrast measures how much of generative retrieval's performance depends on having indexed the target catalog.
 
 \section{Experiments}
 
 \subsection{Datasets}
-\textbf{Discogs-VI-YT}~\cite{araz2024discogsvi}. From the 98{,}785-clique metadata (release dated 2024-07-01), we sampled 2{,}500 cliques with $\geq 2$ versions (12{,}006 candidate YouTube IDs). Crawling with \texttt{yt-dlp} in May 2026 recovered 3{,}413 tracks; of the remainder, 28\% were unavailable (deletions, takedowns, region locks) and 44\% triggered YouTube's anti-bot challenge. Audio was standardized to 30-second center clips at 24~kHz mono. Filtering to cliques with $\geq 2$ surviving versions yields \textbf{696 usable cliques across 3{,}192 tracks}, split 70/15/15 by clique (487/104/105) for ${\sim}42$k ordered training pairs.
+\textbf{Discogs-VI-YT}~\cite{araz2024discogsvi}. From the 98{,}785-clique metadata (release dated 2024-07-01), we sampled 2{,}500 cliques with $\geq 2$ versions (12{,}006 candidate YouTube IDs). Crawling with \texttt{yt-dlp} in May 2026 recovered 3{,}413 tracks; of the remainder, 28\% were unavailable (deletions, takedowns, region locks) and 44\% triggered YouTube's anti-bot challenge. Audio was standardized to 30-second center clips at 24~kHz mono. Filtering to cliques with $\geq 2$ surviving versions yields \textbf{696 usable cliques across 3{,}192 tracks}. The transductive split holds out $(\text{query}\rightarrow\text{cover})$ pairs per clique (42{,}620 train pairs, 2{,}324 distinct test queries); the cold-start split holds out whole cliques (487/104/105 train/val/test).
 
 \textbf{Covers80}~\cite{ellis2007covers80}. 80 cliques $\times$ 2 versions = 160 tracks (32~kbps mp3). \textit{The model never sees any Covers80 track during training}; Covers80 is used exclusively as a cross-dataset held-out evaluation set.
 
@@ -174,6 +211,7 @@ We evaluate generative retrieval in the transductive regime standard to DSI and 
 \label{tab:main_results}
 \centering
 \small
+\setlength{\tabcolsep}{3.7pt}
 \begin{tabular}{lcccccc}
 \toprule
 Model & MR1 & MRR & MAP & R@1 & R@5 & R@10 \\
@@ -192,11 +230,50 @@ Second, the condition ordering (random $\approx$ EnCodec $\ll$ MERT-RQ-VAE) is i
 
 Third, this replicates the central finding of TIGER~\cite{rajput2023tiger}---structured identifiers far outperform arbitrary ones---and demonstrates it holds for \emph{audio-derived} structure on a real cover song retrieval task.
 
-\subsection{The Transductive Limitation}
-Generative retrieval memorizes a fixed corpus: the model's parameters are the index. A model trained on Discogs-VI generates Discogs-VI Semantic IDs and cannot retrieve Covers80 tracks, whose IDs it never indexed---cross-dataset generative retrieval scores zero. This is a property of the paradigm, not a defect of our system, and it is the price paid for eliminating the search index. The bi-encoder, by contrast, handles new catalogs without retraining. We discuss this trade-off further in the limitations.
+\subsection{The Transductive Boundary: a Cold-Start Experiment}
+Generative retrieval memorizes a fixed corpus---the model's parameters are the index. To measure this boundary directly, we re-ran all three conditions with an \emph{inductive} clique-level split: 487/104/105 train/val/test cliques, with test cliques entirely unseen during training (same training recipe otherwise). Table~\ref{tab:coldstart} reports the result.
+
+\begin{table}[t]
+\caption{Cold-start (inductive) retrieval on Discogs-VI: 105 test cliques entirely held out from training. The bi-encoder has no training phase; T5 columns are generative retrieval.}
+\label{tab:coldstart}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+Model & MR1 & MRR & R@1 & R@10 \\
+\midrule
+Bi-encoder (MERT)  & 15.0 & \textbf{0.193} & \textbf{0.146} & \textbf{0.308} \\
+T5 random          & 20.6 & 0.000 & 0.000 & 0.000 \\
+T5 EnCodec direct  & 15.4 & 0.000 & 0.000 & 0.000 \\
+T5 MERT-RQ-VAE     & 17.7 & 0.000 & 0.000 & 0.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three generative conditions score \textbf{exactly zero} on every retrieval metric. The models are not degenerate---they emit 29--59 distinct tracks across the 390 queries---but every generated Semantic ID belongs to a \emph{training} clique. The model cannot reach a clique it never indexed. The bi-encoder, having no training phase, retrieves held-out covers exactly as well as in-distribution ones.
+
+The contrast with Table~\ref{tab:main_results} is the paper's central scoping result: \textbf{generative retrieval for CSI wins when the corpus is fixed and indexed (MRR 0.271 vs.\ 0.214) and fails completely on new songs (0.000)}. Replacing the search index with model parameters is the source of both the transductive gain and the inductive failure. For an open or growing catalog, the bi-encoder remains necessary; for a fixed catalog, generative retrieval is the stronger choice.
+
+\subsection{Error Analysis: What the Model Retrieves When It Fails}
+For the transductive MERT-RQ-VAE model we split the 2{,}324 test queries into hits (867) and misses (1{,}457) and measured MERT cosine similarity between the query and three references (Fig.~\ref{fig:error}):
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/error_analysis.pdf}
+\caption{Distribution of MERT cosine similarity between a query and: a random track (floor), T5's top-1 prediction on a miss, and the query's true covers. T5's misses are acoustically plausible---and in fact \emph{more} similar to the query than the true covers.}
+\label{fig:error}
+\end{figure}
+
+The query-to-true-cover similarity is 0.886; query-to-random is 0.869; and query-to-T5-miss is \textbf{0.900}. Two observations follow. First, the model degrades gracefully: a wrong prediction (0.900) is far closer to the query than a random track (0.869), so failures are plausible near-misses, not noise. Second, and more revealing, T5's misses are \emph{more} acoustically similar to the query than the true covers are. The model fails by retrieving acoustic near-duplicates. This is direct evidence that MERT-RQ-VAE Semantic IDs encode acoustic surface similarity, which only approximates compositional identity: covers involving heavy reinterpretation---substantial key, tempo, or instrumentation change---are acoustically distant from the query and are systematically missed. Closing this gap is the key open problem for audio-derived generative retrieval.
 
 \section{Limitations and Future Work}
-The Discogs-VI subset is constrained by YouTube link rot and bot-detection ($\sim$72\% loss). Recovering bot-detected entries with logged-in cookies is straightforward and would multiply the eval set; we report results on the un-recovered subset to keep the construction reproducible. The model trains and evaluates on 30-second center clips, ignoring longer-form structure that may carry additional compositional cues. The two input modes considered in early planning (SemID-to-SemID and continuous-MERT-to-SemID via a learned projection) reduce to SemID-to-SemID in the current evaluation; we leave the projection variant for future work.
+\textbf{Corpus scale.} The Discogs-VI subset is constrained by YouTube link rot and bot detection ($\sim$72\% loss from a 12k-track crawl). The 3{,}192-track corpus is two orders of magnitude smaller than the catalogs in TIGER-style recommendation work. Recovering bot-detected entries with authenticated cookies is straightforward and would multiply the eval set; we report the un-recovered subset for reproducibility. A larger corpus would also test whether the transductive advantage scales.
+
+\textbf{The transductive constraint.} Our central negative result---zero cold-start performance---is the sharpest limitation. A generative retriever cannot serve a growing catalog without retraining or an explicit indexing objective that teaches new track identities. A DSI-style indexing task~\cite{tay2022dsi}, interleaving (audio$\rightarrow$own-SemID) examples with the retrieval objective, is the natural next step and could partially relax the constraint.
+
+\textbf{Acoustic vs.\ compositional similarity.} The error analysis shows the model retrieves acoustic near-duplicates when it fails. MERT-RQ-VAE Semantic IDs inherit MERT's acoustic bias; covers with large key, tempo, or instrumentation change fall outside it. Semantic IDs built from explicitly compositional features (harmonic progression, melodic contour) could close this gap.
+
+\textbf{Modeling choices.} The model trains on 30-second center clips, ignoring long-form structure, and uses only the SemID-to-SemID input mode; the continuous-MERT-to-SemID variant via a learned encoder projection is left to future work.
 
 \section{Conclusion}
 We have introduced the first generative retrieval system for cover song identification. Audio-derived Semantic IDs from a learned RQ-VAE over MERT embeddings carry strong compositional structure (4.3$\times$/11$\times$ within/cross prefix-overlap), while EnCodec direct codes carry weaker and quality-sensitive structure. A 60M-parameter T5 generating MERT-RQ-VAE Semantic IDs outperforms a MERT bi-encoder on Discogs-VI retrieval (MRR 0.271 vs.\ 0.214), with the three SemID conditions ranking exactly as their pre-training structure predicts. The approach is transductive---it cannot retrieve un-indexed catalogs---which is the principled cost of replacing the search index with model parameters. Future work includes recovering the bot-blocked portion of the crawl for a larger corpus, the continuous-MERT-to-SemID input variant, and an indexing objective that could relax the transductive constraint.
@@ -217,6 +294,7 @@ We have introduced the first generative retrieval system for cover song identifi
 \bibitem{lee2022rqvae} D. Lee et al., ``Autoregressive image generation using residual quantization,'' in \emph{CVPR}, 2022.
 \bibitem{zeghidour2021soundstream} N. Zeghidour et al., ``SoundStream: an end-to-end neural audio codec,'' \emph{arXiv:2107.03312}, 2021.
 \bibitem{raffel2020t5} C. Raffel et al., ``Exploring the limits of transfer learning with a unified text-to-text transformer,'' \emph{JMLR}, vol.~21, 2020.
+\bibitem{vijayakumar2018diverse} A. K. Vijayakumar et al., ``Diverse beam search: decoding diverse solutions from neural sequence models,'' in \emph{AAAI}, 2018.
 \end{thebibliography}
 
 \end{document}

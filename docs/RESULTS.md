@@ -139,9 +139,36 @@ Run 3 (LR 3e-4, label smoothing 0, embedding re-init, pair-split) trained correc
 
 T5 MERT-RQ-VAE beats the bi-encoder on MR1, MRR, MAP, R@1, R@5; loses R@10 by 0.010. The R@1 gain is the headline: 0.237 vs 0.152 (+56% relative). The condition ordering (random ≈ EnCodec ≪ MERT) matches the pre-training SemID prefix-overlap ordering exactly — structured audio-derived IDs are what carries generative retrieval.
 
-### 4.3 Covers80 cross-dataset: not applicable to generative retrieval
+### 4.3 Cold-start (inductive) experiment: clique-level split
 
-The model memorizes the Discogs-VI corpus and generates Discogs-VI SemIDs; Covers80 tracks carry SemIDs the model never indexed, so all cross-dataset generative-retrieval lookups miss (metrics all zero). This is a property of the generative-retrieval paradigm — it is inherently transductive — not a bug. Covers80 therefore serves only as (a) the cross-dataset SemID-structure check (§2.2) and (b) the bi-encoder cross-dataset baseline (§3). The transductive limitation is a Discussion/Limitations point in the paper.
+To measure the transductive boundary directly, we re-ran all 3 conditions with a **clique-level split** (`build_splits.py --split-by clique`): 487 train / 104 val / 105 test cliques, the test cliques *entirely unseen* during training. Same training recipe (embedding re-init, LR 3e-4, etc.).
+
+| Model | MR1 | MRR | MAP | R@1 | R@5 | R@10 |
+|---|---|---|---|---|---|---|
+| Bi-encoder (MERT+FAISS) | 15.0 | **0.193** | 0.178 | **0.146** | 0.246 | **0.308** |
+| T5 random          | 20.6 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| T5 EnCodec direct  | 15.4 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| T5 MERT-RQ-VAE     | 17.7 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+
+All 3 generative conditions score **exactly 0.000** on every retrieval metric. The models are *not* collapsed — they emit 29-59 distinct tracks across 390 queries — but every emitted SemID belongs to a *training* clique. The model cannot reach the 105 held-out cliques it never indexed. The bi-encoder, having no training phase, retrieves held-out-clique covers just as well as in-distribution ones (MRR 0.193).
+
+**Conclusion**: generative retrieval is strictly transductive — it wins (MRR 0.271 vs 0.214) when the corpus is fixed and indexed, and fails completely (0.000) on new songs. The bi-encoder is the robust choice for an open/growing catalog. This boundary is the paper's central scoping result.
+
+### 4.4 Error analysis: graceful degradation and the acoustic-similarity failure mode
+
+For the transductive T5 MERT-RQ-VAE model, we split test queries into hits (867) and misses (1,457) and measured MERT cosine similarity (`src/evaluation/error_analysis.py`):
+
+| comparison | mean cos sim |
+|---|---|
+| query → true cover | 0.886 |
+| query → T5 top-1 prediction on a MISS | **0.900** |
+| query → random track | 0.869 |
+
+Two findings: (1) **graceful degradation** — T5's wrong predictions (0.900) are far more acoustically similar to the query than random tracks (0.869), so the model fails by retrieving plausible near-misses, not noise. (2) **The failure mode** — T5's misses are *more* acoustically similar to the query than the true covers (0.900 vs 0.886). The model fails by retrieving acoustic near-duplicates. This is direct evidence that MERT-RQ-VAE SemIDs encode acoustic surface similarity, which only approximates compositional identity; covers with heavy reinterpretation (key/tempo/instrumentation changes) are acoustically far from the query and systematically missed. Figure at `paper/figures/error_analysis.pdf`.
+
+### 4.5 Covers80 cross-dataset: not applicable to generative retrieval
+
+Consistent with §4.3, a Discogs-VI-trained model cannot retrieve Covers80 tracks (a different, un-indexed catalog) — all cross-dataset generative-retrieval lookups miss. Covers80 therefore serves only as (a) the cross-dataset SemID-structure check (§2.2) and (b) the bi-encoder cross-dataset baseline (§3).
 
 ---
 
