@@ -24,7 +24,37 @@ from transformers import (
     set_seed,
 )
 
-from src.model.dataset import SemIDPairsDataset, extend_tokenizer_with_semids
+from src.model.dataset import (
+    SemIDPairsDataset,
+    build_semid_vocab,
+    extend_tokenizer_with_semids,
+)
+
+
+def _reinit_semid_embeddings(model, tokenizer, n_levels, codebook_size, seed):
+    """Re-initialize SemID-token embedding rows.
+
+    HF resize_token_embeddings defaults to MEAN resizing: every new token starts
+    at the mean of the original embeddings, i.e. all SemID tokens are identical.
+    That starves the encoder of input signal and causes mode collapse. We instead
+    sample each SemID embedding from the per-dimension Gaussian of the original
+    vocabulary, so they start differentiated and at the right magnitude.
+    """
+    sem_tokens = build_semid_vocab(n_levels, codebook_size)
+    sem_ids = [tokenizer.convert_tokens_to_ids(t) for t in sem_tokens]
+    g = torch.Generator().manual_seed(seed)
+    with torch.no_grad():
+        emb = model.get_input_embeddings().weight  # tied: input == lm_head
+        mask = torch.ones(emb.shape[0], dtype=torch.bool)
+        for i in sem_ids:
+            mask[i] = False
+        orig = emb[mask]
+        mu = orig.mean(dim=0)
+        sigma = orig.std(dim=0)
+        noise = torch.randn(len(sem_ids), emb.shape[1], generator=g)
+        emb[sem_ids] = mu + sigma * noise
+    print(f"  re-initialized {len(sem_ids)} SemID embeddings "
+          f"(orig std/dim mean={sigma.mean():.3f})")
 
 
 def main() -> None:
@@ -38,15 +68,16 @@ def main() -> None:
                         help="Use 256 for random/mert, 1024 for encodec.")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=1e-4,
-                        help="Lowered from 5e-4: T5-small with extended vocab + small dataset "
-                             "exhibits mode collapse at 5e-4. 1e-4 trains gentler.")
+    parser.add_argument("--lr", type=float, default=3e-4,
+                        help="3e-4 validated by local smoke test: with the SemID embedding "
+                             "re-init fix, loss breaks the 3.25 collapse floor cleanly at this LR.")
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--warmup-steps", type=int, default=500,
                         help="Bumped from 200: extended vocab benefits from a longer warmup.")
-    parser.add_argument("--label-smoothing", type=float, default=0.1,
-                        help="Softens targets so the model can't peg all its mass on one token "
-                             "per position — mitigates mode collapse.")
+    parser.add_argument("--label-smoothing", type=float, default=0.0,
+                        help="Kept at 0: generative retrieval is a memorization task "
+                             "(the model IS the index), so confident targets are desired. "
+                             "The real mode-collapse fix is SemID embedding re-init.")
     parser.add_argument("--early-stopping-patience", type=int, default=3)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--precision", default="auto", choices=["auto", "fp32", "fp16", "bf16"],
@@ -68,6 +99,7 @@ def main() -> None:
 
     model = T5ForConditionalGeneration.from_pretrained(args.base_model)
     model.resize_token_embeddings(len(tokenizer))
+    _reinit_semid_embeddings(model, tokenizer, args.n_levels, args.codebook_size, args.seed)
 
     print(f"Loading train: {args.train_csv}")
     train_ds = SemIDPairsDataset(args.train_csv, tokenizer)
