@@ -32,7 +32,12 @@ BEAM=${BEAM:-20}
 TOP_K=${TOP_K:-20}
 BEAM_GROUPS=${BEAM_GROUPS:-4}        # >1 enables diverse beam search (anti-mode-collapse)
 DIVERSITY=${DIVERSITY:-0.5}
-SKIP_TRAIN=${SKIP_TRAIN:-0}          # if 1, only re-run inference on existing checkpoints
+SKIP_TRAIN=${SKIP_TRAIN:-0}          # if 1, ALL conditions skip training (re-inference only)
+# ONLY_TRAIN: comma-separated list of conditions to actually train; others use existing
+# HF checkpoints (per-condition skip). Empty = obey SKIP_TRAIN for all conditions.
+# Example: ONLY_TRAIN=clews trains only the new CLEWS condition, reuses Phase-1 weights
+# for random/mert/encodec. Phase 1 weights are pulled by the HF download step at the top.
+ONLY_TRAIN=${ONLY_TRAIN:-}
 PUSH_RESULTS=${PUSH_RESULTS:-1}      # if 1, push runs/preds + RESULTS.md back to HF at the end
 # SPLIT_TAG selects which split family to train/eval on:
 #   ids    -> transductive pair-split (default, the main result)
@@ -49,7 +54,19 @@ python -m src.data.sync_hf_metadata --hf-repo "$HF_REPO" --mode download
 run_condition() {
     local cond="$1"
     local codebook_size="$2"
-    if [ "$SKIP_TRAIN" != "1" ]; then
+
+    # Decide whether to train this condition this run.
+    local do_train=1
+    if [ "$SKIP_TRAIN" = "1" ]; then
+        do_train=0
+    elif [ -n "$ONLY_TRAIN" ]; then
+        case ",${ONLY_TRAIN}," in
+            *,${cond},*) do_train=1 ;;
+            *) do_train=0 ;;
+        esac
+    fi
+
+    if [ "$do_train" = "1" ]; then
         banner "Training: $cond (codebook ${codebook_size}, split=${SPLIT_TAG})"
         python -m src.model.train \
             --train-csv "data/splits/discogs_vi_${cond}_${SPLIT_TAG}_train.csv" \
@@ -59,7 +76,7 @@ run_condition() {
             --epochs "$EPOCHS" \
             --batch-size "$BATCH"
     else
-        banner "SKIP_TRAIN=1: reusing existing checkpoint at runs/t5_${cond}${SUFFIX}"
+        banner "Reusing existing checkpoint: runs/t5_${cond}${SUFFIX} (pulled from HF)"
     fi
 
     banner "Inference (in-distribution test): $cond (split=${SPLIT_TAG}, beam=$BEAM, groups=$BEAM_GROUPS)"
@@ -118,6 +135,7 @@ PY
 run_condition random  256
 run_condition mert    256
 run_condition encodec 1024
+run_condition clews   256
 
 banner "Summary"
 ls -lh runs/t5_*/pytorch_model.bin runs/t5_*/model.safetensors 2>/dev/null || true

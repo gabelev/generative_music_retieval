@@ -1,0 +1,14 @@
+condition: clews_ids
+inherits: base.yaml
+
+semantic_ids:
+  source: clews_rqvae
+  n_levels: 3
+  codebook_size: 256
+
+notes: >
+  RQ-VAE over CLEWS embeddings (Serra et al. 2025; 1024-d, trained for
+  version invariance via contrastive learning on Discogs-VI). Tests whether a
+  task-specific encoder yields better Semantic IDs than a general music
+  encoder (MERT-RQ-VAE). Codebooks trained on Discogs-VI CLEWS embeddings;
+  Covers80 encoded with the same codebooks for cross-dataset consistency.

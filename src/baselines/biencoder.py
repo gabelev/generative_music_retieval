@@ -91,14 +91,19 @@ def main() -> None:
     q_emb = emb[q_idxs].copy()
     faiss.normalize_L2(q_emb)
 
-    # k+1 in case the top hit is the query itself
-    distances, indices = index.search(q_emb, args.top_k + 1)
+    # k+1 in case the top hit is the query itself; clamp to pool size to avoid
+    # FAISS returning -1 sentinels when top_k >= pool_size.
+    k_search = min(args.top_k + 1, len(pool_ids))
+    distances, indices = index.search(q_emb, k_search)
 
     predictions: dict[str, list[str]] = {}
     for i, qid in enumerate(valid_queries):
         ranked: list[str] = []
         for pos in indices[i]:
-            tid = id_of_pool_pos[int(pos)]
+            pos = int(pos)
+            if pos < 0:    # FAISS pads with -1 when fewer than k neighbors exist
+                continue
+            tid = id_of_pool_pos[pos]
             if tid == qid:
                 continue
             ranked.append(tid)

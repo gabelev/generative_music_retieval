@@ -21,9 +21,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-CONDITIONS = ["random", "encodec", "mert"]
-COND_LABELS = {"random": "Random", "encodec": "EnCodec direct", "mert": "MERT-RQ-VAE"}
-COND_COLORS = {"random": "#bdbdbd", "encodec": "#8ab4f8", "mert": "#1a73e8"}
+CONDITIONS = ["random", "encodec", "mert", "clews"]
+COND_LABELS = {
+    "random": "Random",
+    "encodec": "EnCodec direct",
+    "mert": "MERT-RQ-VAE",
+    "clews": "CLEWS-RQ-VAE",
+}
+COND_COLORS = {
+    "random": "#bdbdbd",
+    "encodec": "#8ab4f8",
+    "mert": "#1a73e8",
+    "clews": "#0b4a96",
+}
 
 
 def load_reports(dataset: str, runs_dir: Path) -> dict[str, dict]:

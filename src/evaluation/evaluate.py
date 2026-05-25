@@ -22,6 +22,9 @@ def main() -> None:
     parser.add_argument("--out", required=True,
                         help="JSON metrics report.")
     parser.add_argument("--ks", nargs="+", type=int, default=[1, 5, 10])
+    parser.add_argument("--n-candidates", type=int, default=None,
+                        help="Corpus size for NAR. If unset, NAR is skipped. "
+                             "Pass the full pool size (e.g. 3413 for Discogs-VI).")
     args = parser.parse_args()
 
     with open(args.predictions) as f:
@@ -32,7 +35,8 @@ def main() -> None:
         for r in csv.DictReader(f):
             clique_of[r["track_id"]] = r["clique_id"]
 
-    metrics = compute_all(predictions, clique_of, ks=args.ks)
+    metrics = compute_all(predictions, clique_of, ks=args.ks,
+                          n_candidates=args.n_candidates)
     print("Metrics:")
     for k, v in metrics.items():
         if isinstance(v, float):
