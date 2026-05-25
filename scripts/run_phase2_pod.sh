@@ -151,9 +151,10 @@ echo "Smoke test OK. Files in cache/clews_smoke:"
 ls "$PROJECT_DIR/cache/clews_smoke"
 
 banner "B4. CLEWS inference on full corpus (~3,573 files)"
-# Clear output dir to avoid the same interactive overwrite prompt.
+# Remove (don't recreate) the output dir so CLEWS's "path exists" prompt is
+# false and inference.py creates the dir itself. mkdir-then-rm-then-call would
+# still trigger the prompt and EOFError on < /dev/null.
 rm -rf "$PROJECT_DIR/cache/clews"
-mkdir -p "$PROJECT_DIR/cache/clews"
 (cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 "$CLEWS_PY" inference.py \
     --checkpoint="$CLEWS_CHECKPOINT" \
     --path_in="$PROJECT_DIR/cache/clews_input" \
