@@ -100,8 +100,13 @@ elif [ -f "$CLEWS_DIR/install_requirements.sh" ]; then
     # `pip install ...` and `python ...` calls resolve to our venv (not system).
     (cd "$CLEWS_DIR" && PATH="$PROJECT_DIR/.venv-clews/bin:$PATH" bash install_requirements.sh)
 fi
-# Always make sure torch + torchaudio with CUDA are present (in case requirements.txt pinned CPU torch).
-"$CLEWS_PIP" install --index-url https://download.pytorch.org/whl/cu124 torch torchaudio
+# Pin torch < 2.6 in the clews venv: PyTorch 2.6 changed torch.load to default
+# weights_only=True, which breaks CLEWS's checkpoint load (the .ckpt contains
+# omegaconf.DictConfig objects that the safe-loader blocks).
+"$CLEWS_PIP" install --force-reinstall --index-url https://download.pytorch.org/whl/cu124 \
+    "torch<2.6" "torchaudio<2.6"
+# Explicitly install CLEWS deps the install script tends to miss.
+"$CLEWS_PIP" install omegaconf hydra-core lightning nnAudio einops librosa
 
 banner "B2. Locate or download the CLEWS DVI checkpoint"
 if [ -z "$CLEWS_CHECKPOINT" ]; then
@@ -121,7 +126,10 @@ fi
 echo "Using CLEWS checkpoint: $CLEWS_CHECKPOINT"
 
 banner "B3. Smoke test CLEWS on 5 audio files"
-mkdir -p "$PROJECT_DIR/cache/clews_smoke" "$PROJECT_DIR/cache/clews_smoke_input"
+# Clear cache/clews_smoke first; CLEWS's inference.py interactively prompts when
+# the output dir exists, which deadlocks a non-interactive (tmux/nohup) run.
+rm -rf "$PROJECT_DIR/cache/clews_smoke" "$PROJECT_DIR/cache/clews_smoke_input"
+mkdir -p "$PROJECT_DIR/cache/clews_smoke_input"
 # `ls | head -5` under `set -o pipefail` bails because head closes the pipe early
 # (ls exits 141 / SIGPIPE). Avoid the pipeline:
 ls "$PROJECT_DIR/cache/clews_input" > /tmp/clews_all_keys.txt
@@ -129,10 +137,11 @@ head -5 /tmp/clews_all_keys.txt > /tmp/clews_smoke_keys.txt
 while read -r f; do
     ln -sf "$PROJECT_DIR/cache/clews_input/$f" "$PROJECT_DIR/cache/clews_smoke_input/$f"
 done < /tmp/clews_smoke_keys.txt
+# `< /dev/null` defends against any remaining interactive prompts in inference.py.
 (cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 "$CLEWS_PY" inference.py \
     --checkpoint="$CLEWS_CHECKPOINT" \
     --path_in="$PROJECT_DIR/cache/clews_smoke_input" \
-    --path_out="$PROJECT_DIR/cache/clews_smoke") || {
+    --path_out="$PROJECT_DIR/cache/clews_smoke" < /dev/null) || {
         echo "Smoke test failed. Likely CLEWS sample-rate / clip-length issue."
         echo "  - CLEWS expects 16kHz mono, 2.5min blocks; ours is 24kHz mono, 30-sec."
         echo "  - Manual fix: resample to 16kHz and repeat-pad to 2.5min in cache/clews_input/."
@@ -142,10 +151,13 @@ echo "Smoke test OK. Files in cache/clews_smoke:"
 ls "$PROJECT_DIR/cache/clews_smoke"
 
 banner "B4. CLEWS inference on full corpus (~3,573 files)"
+# Clear output dir to avoid the same interactive overwrite prompt.
+rm -rf "$PROJECT_DIR/cache/clews"
+mkdir -p "$PROJECT_DIR/cache/clews"
 (cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 "$CLEWS_PY" inference.py \
     --checkpoint="$CLEWS_CHECKPOINT" \
     --path_in="$PROJECT_DIR/cache/clews_input" \
-    --path_out="$PROJECT_DIR/cache/clews")
+    --path_out="$PROJECT_DIR/cache/clews" < /dev/null)
 
 banner "B5. Aggregate CLEWS segments -> NPZ (mean-pool)"
 # Discogs-VI: allow keys = track IDs present in discogs_vi_audio.csv
