@@ -142,7 +142,7 @@ for $\ell \in \{1,2,3\}$ with codebook size $K=256$. The Semantic ID is $(c_1, c
 \textbf{A note on quantizer choice.} Unlike TIGER~\cite{rajput2023tiger} and PLUM~\cite{plum2025}, which train a neural RQ-VAE with reconstruction and commitment losses, we use sequential $k$-means quantization of pre-computed embeddings. This simpler choice isolates the effect of the input representation from the quantizer architecture: any improvement we measure across conditions is attributable to the source encoder, not to differences in the quantizer. Our results are therefore a lower bound on what a learned RQ-VAE could achieve. PLUM's SIDv2 ablation (their Table 4) shows that adding a co-occurrence contrastive loss to the RQ-VAE training improves uniqueness from 94.0\% to 96.7\% and recall from 12.3\% to 14.4\% at industrial scale; combining that quantizer with task-specific audio embeddings is the natural next step (\S\ref{sec:future}).
 
 \subsection{Generative Retrieval Model}
-We use T5-small (60M parameters)~\cite{raffel2020t5}. We extend the tokenizer with $3K$ SemID tokens, one per (level, code) pair, and resize the model's input and output embedding matrices. The encoder input is the prefix \texttt{"retrieve cover:"} followed by the query's SemID token sequence; the decoder generates the target SemID. Training uses teacher forcing with cross-entropy loss.
+We use T5-small (60M parameters)~\cite{raffel2020t5}. We extend the tokenizer with $3K$ SemID tokens---one per (level, code) pair---and resize the model's input and output embedding matrices. The encoder input is the prefix \texttt{"retrieve cover:"} followed by the query's SemID token sequence; the decoder generates the target SemID. Training uses teacher forcing with cross-entropy loss.
 
 One implementation detail proved decisive. The standard mean-initialization for resized embeddings sets every new SemID token to the same vector; the encoder then cannot distinguish queries and the model collapses to a constant output. We instead sample each SemID embedding from the original vocabulary's per-dimension Gaussian, which restores input sensitivity and is necessary for the model to train at all.
 
@@ -241,7 +241,7 @@ Second, \textbf{the four-condition ordering tracks SemID structure exactly}. The
 Third, this is the first demonstration that the generative-retrieval paradigm transfers from recommendation to audio retrieval, and the first generative-retrieval system that matches a CSI SOTA bi-encoder.
 
 \subsection{The Transductive Boundary: a Cold-Start Experiment}
-Generative retrieval memorizes a fixed corpus, the model's parameters are the index. To measure this boundary directly, we re-ran all three conditions with an \emph{inductive} clique-level split: 487/104/105 train/val/test cliques, with test cliques entirely unseen during training (same training recipe otherwise). Table~\ref{tab:coldstart} reports the result.
+Generative retrieval memorizes a fixed corpus---the model's parameters are the index. To measure this boundary directly, we re-ran all three conditions with an \emph{inductive} clique-level split: 487/104/105 train/val/test cliques, with test cliques entirely unseen during training (same training recipe otherwise). Table~\ref{tab:coldstart} reports the result.
 
 \begin{table}[t]
 \caption{Cold-start (inductive) retrieval on Discogs-VI: 105 test cliques entirely held out from training. The bi-encoder has no training phase; T5 columns are generative retrieval.}

@@ -1,67 +1,81 @@
 \relax 
+\citation{rajput2023tiger}
+\citation{plum2025}
 \citation{ellis2007covers80,yesiler2019datacos,araz2024discogsvi}
-\citation{yesiler2019move,doh2021coverhunter}
-\citation{tay2022dsi,rajput2023tiger}
-\citation{palumbo2025text2tracks,kim2026fusid,mei2025semids}
+\citation{yesiler2019move,doh2021coverhunter,serra2025clews}
 \citation{rajput2023tiger}
 \citation{defossez2022encodec}
-\citation{yuan2023mert}
+\citation{serra2025clews}
 \citation{tay2022dsi}
 \citation{rajput2023tiger}
+\citation{plum2025}
 \citation{palumbo2025text2tracks}
 \citation{kim2026fusid}
 \citation{mei2025semids}
 \@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Generative Retrieval}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Generative Retrieval for Recommendation}{1}{}\protected@file@percent }
 \citation{ellis2007covers80}
 \citation{yesiler2019datacos}
 \citation{araz2024discogsvi}
 \citation{yesiler2019move}
 \citation{doh2021coverhunter}
+\citation{serra2025clews}
 \citation{yuan2023mert}
 \citation{defossez2022encodec}
 \citation{lee2022rqvae,zeghidour2021soundstream}
 \citation{yuan2023mert}
 \citation{defossez2022encodec}
-\citation{raffel2020t5}
-\citation{vijayakumar2018diverse}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Generative retrieval pipeline. A frozen audio encoder and a quantizer map each track to a discrete Semantic ID; a fine-tuned T5 autoregressively generates the Semantic ID of a cover, which is resolved to a track. The model's parameters replace the embedding index.}}{2}{}\protected@file@percent }
-\newlabel{fig:pipeline}{{1}{2}{}{figure.1}{}}
+\citation{serra2025clews}
+\citation{rajput2023tiger}
+\citation{plum2025}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Cover Song Identification}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Discrete Audio Representations}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}The Bridge We Make}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Discrete Audio Representations}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {III}Method}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Task Formulation}{2}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Generative retrieval pipeline. A frozen audio encoder and a quantizer map each track to a discrete Semantic ID; a fine-tuned T5 autoregressively generates the Semantic ID of a cover, which is resolved to a track. The model's parameters replace the embedding index.}}{2}{}\protected@file@percent }
+\newlabel{fig:pipeline}{{1}{2}{}{figure.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Semantic ID Construction}{2}{}\protected@file@percent }
 \newlabel{eq:rqvae}{{1}{2}{}{equation.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Generative Retrieval Model}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Evaluation Regimes}{2}{}\protected@file@percent }
+\citation{raffel2020t5}
+\citation{vijayakumar2018diverse}
 \citation{araz2024discogsvi}
 \citation{ellis2007covers80}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Generative Retrieval Model}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Evaluation Regimes}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {IV}Experiments}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Datasets}{3}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Within- vs cross-clique prefix-share rates on Discogs-VI for the four SemID conditions. Bar height is the fraction of pairs sharing the indicated prefix; annotated multiplier on each within bar is the within/cross ratio. The ordering random ($\approx $ noise floor) $\ll $ EnCodec $\ll $ MERT $\ll $ CLEWS tracks the version-invariance quality of the source encoder, and matches the retrieval ordering in Table~\ref {tab:main_results}.}}{3}{}\protected@file@percent }
+\newlabel{fig:prefix_overlap}{{2}{3}{}{figure.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Training Configuration}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Baselines and Metrics}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {V}Results and Analysis}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Semantic ID Structure Before Training}{3}{}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Within- vs cross-clique prefix-share rates on Discogs-VI for the three SemID conditions. Bar height is the fraction of pairs sharing the indicated prefix; annotated multiplier on each within bar is the within/cross ratio. Random IDs sit at the noise floor (1.06$\times $); MERT-RQ-VAE encodes compositional structure most strongly.}}{3}{}\protected@file@percent }
-\newlabel{fig:prefix_overlap}{{2}{3}{}{figure.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Semantic ID quality on Discogs-VI (3{,}413 tracks). Within/cross is the ratio of prefix-share rates inside vs.\ across cliques. Higher = more compositional structure encoded.}}{3}{}\protected@file@percent }
-\newlabel{tab:semid_quality}{{I}{3}{}{table.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Cross-Dataset Structure Transfer}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}EnCodec Collapses on Low-Bitrate Audio}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Main Retrieval Results}{3}{}\protected@file@percent }
+\citation{serra2025clews}
 \citation{rajput2023tiger}
+\citation{plum2025}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Semantic ID quality on Discogs-VI (3{,}413 tracks). Within/cross is the ratio of prefix-share rates inside vs.\ across cliques. Higher = more compositional structure encoded.}}{4}{}\protected@file@percent }
+\newlabel{tab:semid_quality}{{I}{4}{}{table.1}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces t-SNE projection of MERT-RQ-VAE Semantic IDs (codebook-expanded) for the 20 most-populous Discogs-VI cliques. Tracks within a clique are colored alike; visible coloring suggests that the SemID code space separates cliques to a meaningful extent.}}{4}{}\protected@file@percent }
 \newlabel{fig:tsne}{{3}{4}{}{figure.3}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Retrieval on Discogs-VI (2{,}324 query tracks). Bi-encoder is MERT + FAISS; T5 rows are generative retrieval, one model per SemID condition. Best per column in bold.}}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Cross-Dataset Structure Transfer}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Retrieval on Discogs-VI (2{,}324 query tracks, transductive split). Bi-encoder is MERT + FAISS at full pool; T5 rows are generative retrieval at beam-200, one model per SemID condition. Lower is better for MR1 and NAR; higher is better for all others. Best per column in bold.}}{4}{}\protected@file@percent }
 \newlabel{tab:main_results}{{II}{4}{}{table.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}The Transductive Boundary: a Cold-Start Experiment}{4}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Cold-start (inductive) retrieval on Discogs-VI: 105 test cliques entirely held out from training. The bi-encoder has no training phase; T5 columns are generative retrieval.}}{4}{}\protected@file@percent }
-\newlabel{tab:coldstart}{{III}{4}{}{table.3}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Distribution of MERT cosine similarity between a query and: a random track (floor), T5's top-1 prediction on a miss, and the query's true covers. T5's misses are acoustically plausible---and in fact \emph  {more} similar to the query than the true covers.}}{4}{}\protected@file@percent }
-\newlabel{fig:error}{{4}{4}{}{figure.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-F}}Error Analysis: What the Model Retrieves When It Fails}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}EnCodec Collapses on Low-Bitrate Audio}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Main Retrieval Results}{4}{}\protected@file@percent }
+\newlabel{sec:retrieval}{{\mbox  {V-D}}{4}{}{subsection.5.4}{}}
+\citation{plum2025}
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Cold-start (inductive) retrieval on Discogs-VI: 105 test cliques entirely held out from training. The bi-encoder has no training phase; T5 columns are generative retrieval.}}{5}{}\protected@file@percent }
+\newlabel{tab:coldstart}{{III}{5}{}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}The Transductive Boundary: a Cold-Start Experiment}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-F}}Error Analysis: Two Failure Modes}{5}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Mean cosine similarity of query against true cover, T5's wrong top-1 prediction, and a random corpus track, in each condition's own embedding space.}}{5}{}\protected@file@percent }
+\newlabel{tab:errors}{{IV}{5}{}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Distribution of MERT cosine similarity between a query and three references for the T5 MERT condition. T5's misses are \emph  {more} acoustically similar to the query than the true covers, evidencing the acoustic-near-duplicate failure mode.}}{5}{}\protected@file@percent }
+\newlabel{fig:error}{{4}{5}{}{figure.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Limitations and Future Work}{5}{}\protected@file@percent }
+\newlabel{sec:future}{{VI}{5}{}{section.6}{}}
 \citation{tay2022dsi}
 \bibcite{tay2022dsi}{1}
 \bibcite{rajput2023tiger}{2}
@@ -79,7 +93,8 @@
 \bibcite{zeghidour2021soundstream}{14}
 \bibcite{raffel2020t5}{15}
 \bibcite{vijayakumar2018diverse}{16}
-\@writefile{toc}{\contentsline {section}{\numberline {VI}Limitations and Future Work}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{References}{5}{}\protected@file@percent }
-\gdef \@abspage@last{5}
+\bibcite{serra2025clews}{17}
+\bibcite{plum2025}{18}
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{6}{}\protected@file@percent }
+\gdef \@abspage@last{6}
