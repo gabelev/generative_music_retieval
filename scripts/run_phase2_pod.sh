@@ -84,19 +84,24 @@ banner "B1. Clone CLEWS repo + install in a separate venv (.venv-clews)"
 if [ ! -d "$CLEWS_DIR" ]; then
     git clone "$CLEWS_REPO_URL" "$CLEWS_DIR"
 fi
+PROJECT_DIR="$(pwd)"
+CLEWS_PIP="$PROJECT_DIR/.venv-clews/bin/pip"
+CLEWS_PY="$PROJECT_DIR/.venv-clews/bin/python"
 if [ ! -d .venv-clews ]; then
     python -m venv .venv-clews
-    .venv-clews/bin/pip install --upgrade pip
-    # CLEWS dependencies: install via its requirements.txt or install_requirements.sh
-    if [ -f "$CLEWS_DIR/requirements.txt" ]; then
-        .venv-clews/bin/pip install -r "$CLEWS_DIR/requirements.txt"
-    elif [ -f "$CLEWS_DIR/install_requirements.sh" ]; then
-        # The shell script likely uses pip directly; run it inside the venv.
-        (cd "$CLEWS_DIR" && ../.venv-clews/bin/pip install $(grep -E "^pip install" install_requirements.sh | sed 's/.*pip install //'))
-    fi
-    # Always make sure torch + torchaudio with CUDA are present.
-    .venv-clews/bin/pip install --index-url https://download.pytorch.org/whl/cu124 torch torchaudio
+    "$CLEWS_PIP" install --upgrade pip
 fi
+# CLEWS dependencies: install via its requirements.txt or install_requirements.sh.
+# Re-running is idempotent — pip skips already-installed packages.
+if [ -f "$CLEWS_DIR/requirements.txt" ]; then
+    "$CLEWS_PIP" install -r "$CLEWS_DIR/requirements.txt"
+elif [ -f "$CLEWS_DIR/install_requirements.sh" ]; then
+    # Run install_requirements.sh with our venv's bin/ first on PATH so its
+    # `pip install ...` and `python ...` calls resolve to our venv (not system).
+    (cd "$CLEWS_DIR" && PATH="$PROJECT_DIR/.venv-clews/bin:$PATH" bash install_requirements.sh)
+fi
+# Always make sure torch + torchaudio with CUDA are present (in case requirements.txt pinned CPU torch).
+"$CLEWS_PIP" install --index-url https://download.pytorch.org/whl/cu124 torch torchaudio
 
 banner "B2. Locate or download the CLEWS DVI checkpoint"
 if [ -z "$CLEWS_CHECKPOINT" ]; then
@@ -116,29 +121,28 @@ fi
 echo "Using CLEWS checkpoint: $CLEWS_CHECKPOINT"
 
 banner "B3. Smoke test CLEWS on 5 audio files"
-mkdir -p cache/clews_smoke
-ls cache/clews_input | head -5 > /tmp/clews_smoke_keys.txt
-mkdir -p cache/clews_smoke_input
+mkdir -p "$PROJECT_DIR/cache/clews_smoke" "$PROJECT_DIR/cache/clews_smoke_input"
+ls "$PROJECT_DIR/cache/clews_input" | head -5 > /tmp/clews_smoke_keys.txt
 while read -r f; do
-    ln -sf "$(pwd)/cache/clews_input/$f" "cache/clews_smoke_input/$f"
-done < <(head -5 /tmp/clews_smoke_keys.txt)
-(cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 ../.venv-clews/bin/python inference.py \
+    ln -sf "$PROJECT_DIR/cache/clews_input/$f" "$PROJECT_DIR/cache/clews_smoke_input/$f"
+done < /tmp/clews_smoke_keys.txt
+(cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 "$CLEWS_PY" inference.py \
     --checkpoint="$CLEWS_CHECKPOINT" \
-    --path_in="$(pwd)/../generative_music_retieval/cache/clews_smoke_input" \
-    --path_out="$(pwd)/../generative_music_retieval/cache/clews_smoke") || {
+    --path_in="$PROJECT_DIR/cache/clews_smoke_input" \
+    --path_out="$PROJECT_DIR/cache/clews_smoke") || {
         echo "Smoke test failed. Likely CLEWS sample-rate / clip-length issue."
         echo "  - CLEWS expects 16kHz mono, 2.5min blocks; ours is 24kHz mono, 30-sec."
         echo "  - Manual fix: resample to 16kHz and repeat-pad to 2.5min in cache/clews_input/."
         exit 1
 }
 echo "Smoke test OK. Files in cache/clews_smoke:"
-ls cache/clews_smoke
+ls "$PROJECT_DIR/cache/clews_smoke"
 
 banner "B4. CLEWS inference on full corpus (~3,573 files)"
-(cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 ../.venv-clews/bin/python inference.py \
+(cd "$CLEWS_DIR" && OMP_NUM_THREADS=1 "$CLEWS_PY" inference.py \
     --checkpoint="$CLEWS_CHECKPOINT" \
-    --path_in="$(pwd)/../generative_music_retieval/cache/clews_input" \
-    --path_out="$(pwd)/../generative_music_retieval/cache/clews")
+    --path_in="$PROJECT_DIR/cache/clews_input" \
+    --path_out="$PROJECT_DIR/cache/clews")
 
 banner "B5. Aggregate CLEWS segments -> NPZ (mean-pool)"
 # Discogs-VI: allow keys = track IDs present in discogs_vi_audio.csv
