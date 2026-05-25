@@ -122,7 +122,10 @@ echo "Using CLEWS checkpoint: $CLEWS_CHECKPOINT"
 
 banner "B3. Smoke test CLEWS on 5 audio files"
 mkdir -p "$PROJECT_DIR/cache/clews_smoke" "$PROJECT_DIR/cache/clews_smoke_input"
-ls "$PROJECT_DIR/cache/clews_input" | head -5 > /tmp/clews_smoke_keys.txt
+# `ls | head -5` under `set -o pipefail` bails because head closes the pipe early
+# (ls exits 141 / SIGPIPE). Avoid the pipeline:
+ls "$PROJECT_DIR/cache/clews_input" > /tmp/clews_all_keys.txt
+head -5 /tmp/clews_all_keys.txt > /tmp/clews_smoke_keys.txt
 while read -r f; do
     ln -sf "$PROJECT_DIR/cache/clews_input/$f" "$PROJECT_DIR/cache/clews_smoke_input/$f"
 done < /tmp/clews_smoke_keys.txt
