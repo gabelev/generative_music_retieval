@@ -1,7 +1,9 @@
 # Generative Music Retrieval
 
-Research repo for **Generative Retrieval for Cover Song Identification via
-Audio-Derived Semantic IDs** (ICECCME 2026, IEEE).
+Official code for **Generative Retrieval for Cover Song Identification via
+Audio-Derived Semantic IDs**, accepted at the International Conference on
+Electrical, Computer, Communications and Mechatronics Engineering
+(**ICECCME 2026**, IEEE).
 
 A T5 model is trained to autoregressively generate a discrete **Semantic ID**
 of a cover version given a query track, replacing the traditional
